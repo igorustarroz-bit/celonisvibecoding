@@ -338,3 +338,18 @@ Decided but not yet built:
   forms, 0 username or password fields, `noindex,nofollow` on all of them.
 - Only outbound links: hanzo.es and the GitHub repo, both in the index.
 - Zero third-party requests on the published pages (verified in the browser).
+
+## 6. Log — 2026-09-07, leftovers found by the second sweep while publishing experiment 5
+
+Running the §4 second pass before pushing `celosphere/` showed leftovers in the OLDER pages
+(they predate the second pass): `3d-globe/index.html` + `original.html` had 39 `<picture>`
+`<source srcset="https://delivery-…adobeaemcloud.com/…">` each (CDN requests) and the original 17
+saved tracking pixels; the four `datacore/` pages had 3 such `<source>`s and 2 pixels each; and a
+`<video src="https://www.celonis.com/assets/videos/media_….mp4">` in 3d-globe (both pages) and
+datacore (`Data Core _ Celonis.html`, `original.html`). Fixed in the same push (Igor's rule: apply
+the measures the moment a page is seen without them): sources / pixels removed with the same
+regexes as `clean-saved-page.py`; the datacore video re-pointed to its local copy
+(`Data Core _ Celonis_files/media_1d4c….mp4`, already tracked); the 3d-globe video
+(`media_112a…`, never saved locally) lost its `src` — the element stays for layout, plays nothing.
+Both sweeps clean after that. Experiment 5's pages were clean from the start (§2 + the extra
+Qualified/Bing pass described in `claude_celosphere_context.md` §2).
