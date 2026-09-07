@@ -61,7 +61,10 @@
     });
 
     function get(path) { return path.split('.').reduce(function (o, k) { return o[k]; }, T); }
-    function set(path, val) { var ks = path.split('.'), o = T; for (var i = 0; i < ks.length - 1; i++) o = o[ks[i]]; o[ks[ks.length - 1]] = val; }
+    function set(path, val) {
+      var ks = path.split('.'), o = T; for (var i = 0; i < ks.length - 1; i++) o = o[ks[i]]; o[ks[ks.length - 1]] = val;
+      if (window.SEAL_INVALIDATE) window.SEAL_INVALIDATE();   // the effect renders on demand (v22): ask for a frame
+    }
     var updaters = [];
     function slider(label, path, min, max, opts) {
       opts = opts || {};
@@ -176,6 +179,7 @@
     btns.querySelector('#sl-reset').addEventListener('click', function () {
       (function apply(dst, src) { for (var k in src) { if (typeof src[k] === 'object' && src[k] !== null) apply(dst[k], src[k]); else dst[k] = src[k]; } })(T, DEFAULTS);
       updaters.forEach(function (f) { f(); });
+      if (window.SEAL_INVALIDATE) window.SEAL_INVALIDATE();
     });
   });
 })();

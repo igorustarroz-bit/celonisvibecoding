@@ -353,3 +353,18 @@ regexes as `clean-saved-page.py`; the datacore video re-pointed to its local cop
 (`media_112a…`, never saved locally) lost its `src` — the element stays for layout, plays nothing.
 Both sweeps clean after that. Experiment 5's pages were clean from the start (§2 + the extra
 Qualified/Bing pass described in `claude_celosphere_context.md` §2).
+
+Same day, second pass (while adding the page shell): the Qualified chat host `<q-root …>` was still
+sitting AFTER `</body>` in `3d-globe/index.html` + `original.html`, `3d-book/index.html` +
+`original.html`, and the four `datacore/` pages — with `@font-face` rules pointing at
+`js.qualified.com` (6 KB each in 3d-globe/datacore) and Spanish "AI asistente" aria-labels. The
+generic script never looked past `</body>`. Removed (tail cut back to `</body></html>`). In the same pass the rest of the celosphere "extra" list was applied to the 12 older tracked
+pages (`3d-globe`, `3d-book`, `datacore` ×4, `Concept-Video-Scroll` ×4): `<q-focus-sentinel>`
+(Spanish "AI asistente" labels), the empty `<div id="batBeacon…">`, the Qualified
+`<style>#q-messenger-frame-skip-link…</style>` (~8 KB each) and the browser-extension
+`.imageye-selected` style. `3d-globe/index.html` also still loaded Poppins from
+`fonts.googleapis.com` (preconnect + css2 link — an external request on every load): replaced by
+`../lib/poppins.css`. Rule for sweeps: grep `q-root|q-focus|js.qualified.com|batBeacon|asistente|
+googleapis` over EVERY tracked page, not only the new one. Left as is: a `cdn.cookielaw.org` logo
+URL inside the saved OneTrust CSS (`.ot-floating-button__front`), which only loads if that element
+exists — it does not on our pages.

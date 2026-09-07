@@ -4,7 +4,8 @@
 > to `experiments/`. Process reference: `claude_newexperiment_context.md`. Anti-phishing
 > rules: `claude_antiphishing_context.md`.
 
-**Status (2026-09-07): FINISHED and PUBLISHED** (v21 of `seal-knit.js`, Igor's approved values).
+**Status (2026-09-07): FINISHED and PUBLISHED** (v22 of `seal-knit.js`, Igor's approved values; v22 = the
+phone fixes below, no visual change).
 Published at `https://igorustarroz-bit.github.io/celonisvibecoding/experiments/celosphere/index.html`
 and linked from the root index as Experiment 5. Igor's rule for this experiment while it was
 being built was "nothing goes to GitHub until it is finished locally"; it was finished and pushed
@@ -204,7 +205,7 @@ labelled render and checked against the artwork. Circle = the stripes' bounding 
 - The "Celosphere 26" wordmark is a crop of the PNG (1400 px wide, PNG data URI, 45 KB) with
   its box relative to the circle — the original artwork, not text.
 
-## 7. `seal-knit.js` (v21) + `seal-tuner.js` — the effect
+## 7. `seal-knit.js` (v22) + `seal-tuner.js` (v17) — the effect
 
 - A spacer `#seal-intro-space` (`introVH` = 1.5 viewport heights, `margin: 0`, black
   background — the page's base colour is white, only the hero wrapper is dark) is inserted at
@@ -333,8 +334,35 @@ labelled render and checked against the artwork. Circle = the stripes' bounding 
   linear with the scroll, fading in). Desktop unchanged.
 - Auto-play scrolls to the end of the knit (`autoPlayTo` −1 = knit end) and stops.
 - The pointer reaction is off until the seal is fully formed (K ≥ 1) — Igor, v11.
+- **v22 — phones: no more zooming, no more idle work (2026-09-07, after Igor tested v21 on his
+  phone: "it gets big and small, and the performance is not great").** Three causes, three fixes:
+  1. The countdown card waited off-screen to the RIGHT (`translateX(0.4 vw)`) while `.hero-landing`
+     was `overflow: visible` (the seal-stage rule), so the document was 504 px wide on a 390 px
+     phone during the sequence and 390 px after it — the browser zoomed the page out and back in.
+     Fixed by Igor's site-wide rule: one `<div class="page-shell">` (`overflow-x: clip`) around
+     the whole body of every experiment page, `lib/page-shell.css` — see
+     `claude_newexperiment_context.md` §4b. Verified: `scrollWidth === innerWidth` at every T.
+  2. `layout()` re-read `innerHeight` on every `resize`; on phones the address bar collapsing
+     fires one with the same width and ~60–100 px more height, so the spacer (`totalVH × vh`)
+     and T jumped mid-scroll. Now `vh` comes from a fixed `height: 100vh` probe and is re-read
+     only when the width changes (or the height by > 25 %); only the canvas backing store
+     follows the live `innerHeight` (`ch`), so nothing is stretched. On phones the geometry is
+     therefore laid out for the LARGE viewport (centre ≈ 30 px below the visual centre while the
+     bar shows) — stable beats exact here.
+  3. The rAF loop cleared and redrew the full canvas every frame forever. Now `frame()` draws
+     only when the scroll, the pointer / tilt key, a knob (`SEAL_INVALIDATE()`, called by the
+     tuner's `set()` and Reset), the layout, a font or the wordmark changed, or while any
+     smoothed width / fly value is still moving (`settling`, EPS 1e-4) or a digit is still
+     flickering. Measured: 0 draws per second at rest (T = 1 and in the holds); ~40 during a
+     hover gesture. Tilt noise on phones still redraws while the seal is on screen — that is
+     the tilt feature; off-screen the draw returns after a `clearRect`.
+  Also removed in the same pass: the Qualified `<q-root>` tails after `</body>` in the older
+  experiments (see the anti-phishing doc §6).
 
 ## 8. Publish log and next steps
+
+Second push, 2026-09-07 (v22): `page-shell` on all 6 experiment pages + `lib/page-shell.css`,
+`seal-knit.js` v22 / `seal-tuner.js` v17, process doc §4b, q-root tails removed in older pages.
 
 Published 2026-09-07: root `index.html` block "Experiment 5" (links open in a new window, the
 `original.html` link labelled "Saved original (static seal)"), README updated (`celosphere/`,

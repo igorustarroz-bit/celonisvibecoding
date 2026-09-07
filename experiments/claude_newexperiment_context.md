@@ -16,7 +16,8 @@ Docs to keep at hand (not duplicated here):
 - The doc of whichever experiment you copy the mechanics from (`claude_globe_context.md`,
   `claude_datacore_context.md`, `claude_3dbook_context.md`, `claude_videoscroll_context.md`).
 - Shared libraries live in `lib/` (three.min.js, three-post.js, sprite.js, Poppins,
-  gsap.min.js + ScrollTrigger.min.js 3.5.1, tilt-parallax.js, inert-form.*): load them as
+  IBM Plex Mono, gsap.min.js + ScrollTrigger.min.js 3.5.1, tilt-parallax.js, inert-form.*,
+  page-shell.css): load them as
   `../lib/...`, never copy them into the experiment folder and never load them from a CDN
   (every request must be same-origin, and the pages must work from `file://`).
 
@@ -154,6 +155,54 @@ Add to **all** saved pages in the folder (index and original), right before `</b
 > experiment's script: `<script src="../lib/tilt-parallax.js?v=N">`. Used by the Data Core
 > (`index3d.html`, datacore-3d v29) and the book (v12).
 
+## 4b. Page shell — one wrapper around everything in `<body>` (Igor's rule, 2026-09-07)
+
+Every experiment page (`index.html` and its variants, not `original.html`) wraps ALL of its
+body content in one `<div class="page-shell">` and loads `../lib/page-shell.css`:
+
+```html
+<link rel="stylesheet" href="../lib/page-shell.css">   <!-- in <head> -->
+…
+<body class="…"><div class="page-shell">
+  … everything the saved page had in <body>, plus our <script>s …
+</div></body>
+```
+
+```css
+.page-shell { position: relative; width: 100%; max-width: 100%; overflow-x: clip; }
+```
+
+Why: on phones the browser sizes the layout viewport to the widest content. Anything an
+effect pushes past the right edge — a parallax riser, a fly-in, a card waiting off-screen —
+widens the document, and the phone zooms the WHOLE page out, then back in when the element
+arrives ("the page gets big and small", Igor, celosphere v21: the countdown card translated
+right by 0.4 vw made a 390 px page 504 px wide during the sequence). The shell clips the
+horizontal overflow at the document level so the layout viewport stays at the device width
+and every page behaves the same. Rules of the shell: `overflow-x: clip`, NOT `hidden`
+(hidden would make the shell a scroll container and break `position: sticky` inside it — the
+video stages of experiment 1 — and no `hidden` fallback for the same reason); no `z-index`
+(it must not create a stacking context: the hero-above-canvas tricks rely on the root
+context); fixed elements (nav, canvases, tuners) are unaffected, their containing block is
+the viewport. Scripts that append to `document.body` (canvas, tuner, sprite) land outside
+the shell — fine, they are fixed.
+
+Two more phone rules learned with the same bug, for any scroll-driven effect:
+- Never derive geometry or scroll distances from `window.innerHeight` on every resize: the
+  address bar collapsing/expanding fires `resize` with the same width and a different
+  height, and the sequence jumps or the figure changes size mid-scroll. Read the stable
+  height from a `position: fixed; height: 100vh` probe, re-read it only when the width (or
+  the height by more than ~25 %) changes, and let only the canvas backing store follow the
+  live `innerHeight` (celosphere `seal-knit.js` v22, `layout()`).
+- Render on demand. A `requestAnimationFrame` loop that clears and redraws a full-screen
+  canvas 60 times a second forever is what makes phones warm. Keep the loop but draw only
+  when something can have changed — scroll position, pointer / tilt, a knob (the tuner calls
+  a `<KNOBS>_INVALIDATE()` hook), layout, a font or image arriving — or while a smoothed value
+  is still travelling toward its target (`settling` flag). At rest: zero draws
+  (`seal-knit.js` v22, `frame()`).
+
+Verification (headless Chromium, `isMobile: true`, 390 px): `document.documentElement.scrollWidth
+=== innerWidth` at every point of the sequence, and the draw count over 1 s at rest is 0.
+
 ## 5. Build the effect
 
 Our own JS goes in the experiment subfolder, loaded from `index.html` with its own
@@ -217,6 +266,10 @@ to `experiments/`.
 - [ ] Network requests of the published page: all same-origin.
 - [ ] `<script src="../nav-fx.js?v=N">` on every page in the folder, with the `?v=`
       bumped if the JS was touched.
+- [ ] `<div class="page-shell">` around the whole body + `../lib/page-shell.css` (section 4b);
+      at 390 px in mobile emulation `scrollWidth === innerWidth` through the whole effect.
+- [ ] The effect draws nothing at rest (0 frames in 1 s once settled) and does not read
+      `innerHeight` on every resize (section 4b).
 - [ ] New links in the index, with `target="_blank" rel="noopener"`.
 - [ ] `.gitignore` rules with the correct prefix for the new folder's tracking files.
 - [ ] The published page opened in the browser and checked at 1440×900 and on mobile.

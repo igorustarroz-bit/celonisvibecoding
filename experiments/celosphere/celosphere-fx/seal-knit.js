@@ -25,6 +25,11 @@
      scrolls with the hero like the original picture did.
    - Canvas 2D, white on black, one fixed <canvas> (pointer-events: none, z-index 8:
      under the site's fixed header, which sits in a z-index 9 context).
+   - Rendering is on demand (v22): a frame is drawn only when the scroll, the pointer / tilt,
+     a knob, the layout or a loading font / image changed, or while a smoothed value is still
+     travelling; at rest nothing is drawn. The viewport height used for the spacer and the
+     geometry is the stable 100vh (a probe element), not innerHeight, so the address bar
+     collapsing on phones no longer resizes the sequence mid-scroll.
 
    Tuning: every knob lives on window.SEAL (read every frame) — see seal-tuner.js.
    window.SEAL_INFO() reports what is really in effect (dpr, canvas px, blur).
@@ -268,15 +273,28 @@
     }
   }
 
-  var vw = 0, vh = 0, dpr = 1, spacerH = 1;
+  /* Viewport size. `vh` is the STABLE viewport height — the height of a 100vh probe, i.e. the
+     largest viewport on phones — not window.innerHeight, which changes every time the browser's
+     address bar collapses or expands while scrolling. Deriving the spacer and the geometry from
+     innerHeight made the whole sequence jump (T and the seal's size changed mid-scroll) on phones
+     (v22). Only the canvas backing store follows the live height (`ch`), so nothing is stretched. */
+  var vw = 0, vh = 0, ch = 0, dpr = 1, spacerH = 1;
+  var probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;top:0;left:0;width:0;height:100vh;visibility:hidden;pointer-events:none;';
+  document.body.appendChild(probe);
   function layout() {
-    vw = window.innerWidth; vh = window.innerHeight;
+    var nw = window.innerWidth, nh = probe.offsetHeight || window.innerHeight;
+    // the stable height is re-read only on a real change of shape (width, orientation, a big window
+    // resize); browsers where 100vh still follows the address bar cannot move the sequence either
+    if (nw !== vw || !vh || Math.abs(nh - vh) > vh * 0.25) vh = nh;
+    vw = nw; ch = window.innerHeight;
     dpr = Math.min(SEAL.quality.dprMax, window.devicePixelRatio || 1);
-    var w = Math.round(vw * dpr), h = Math.round(vh * dpr);
+    var w = Math.round(vw * dpr), h = Math.round(ch * dpr);
     if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
     canvas.style.filter = SEAL.quality.softBlur > 0 ? 'blur(' + SEAL.quality.softBlur + 'px)' : '';
     spacerH = REDUCED ? 0 : Math.round(vh * totalVH());
     spacer.style.height = spacerH + 'px';
+    dirty = true;
   }
   function totalVH() { return SEAL.knitVH + SEAL.hold1VH + SEAL.shiftVH + SEAL.hold2VH + SEAL.settleVH; }
   // phase boundaries as fractions of the whole sequence
@@ -311,9 +329,10 @@
 
 
   /* ---------- draw ---------- */
-  var lastNow = 0;
+  var lastNow = 0, settling = false, EPS = 1e-4;   // settling: some smoothed value has not reached its target yet
   function draw(now) {
     var dt = lastNow ? Math.min(0.05, (now - lastNow) / 1000) : 0.016; lastNow = now;
+    settling = false;
     var T = spacerH > 0 ? clamp(window.scrollY / spacerH, 0, 1) : 1;
     var M = marks();
     var K = clamp(T / Math.max(1e-3, M.knitEnd), 0, 1);                                            // knit
@@ -334,12 +353,12 @@
     if (T >= 1) { cx = tgt.x; cy = tgt.y; R = tgt.R; }
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, vw, vh);
+    ctx.clearRect(0, 0, vw, ch);
     var bg = 1 - smooth((T - SEAL.bgFadeStart) / (SEAL.bgFadeEnd - SEAL.bgFadeStart));
-    if (bg > 0) { ctx.globalAlpha = bg; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, vw, vh); }
+    if (bg > 0) { ctx.globalAlpha = bg; ctx.fillStyle = '#000'; ctx.fillRect(0, 0, vw, ch); }
 
     // off screen after landing → nothing to draw
-    if (T >= 1 && (cy + R * 1.8 < 0 || cy - R > vh)) { ctx.globalAlpha = 1; return; }
+    if (T >= 1 && (cy + R * 1.8 < 0 || cy - R > ch)) { ctx.globalAlpha = 1; return; }
 
     function sx(u, v) { return cx + (u * D[0] + v * N[0]) * R; }
     function sy(u, v) { return cy - (u * D[1] + v * N[1]) * R; }
@@ -364,6 +383,7 @@
       var wt = s.th;
       if (P) { var near = smooth(1 - segDist(P, s) / H.radius); wt = s.th * lerp(1, lerp(H.thin, H.thick, near), on); }
       s.wcur = (s.wcur == null ? s.th : s.wcur) + (wt - (s.wcur == null ? s.th : s.wcur)) * k;
+      if (Math.abs(wt - s.wcur) > EPS) settling = true;
       // hover displacement: the row slides out along its stripe as in the formation, more the closer
       // the pointer is to the rim, more for rows near the pointer
       var ft = 0;
@@ -371,6 +391,7 @@
       // rigid piece and nothing inside it can collide
       if (P && K >= 1) { var nearS = smooth(1 - Math.abs(pv - s.v) / H.flyRadius); ft = hoverShift(s.ri, (s.u0 + s.u1) / 2, on * edge * H.fly * lerp(H.flyFar, H.flyNear, nearS), pu); }
       s.fly = (s.fly || 0) + (ft - (s.fly || 0)) * k;
+      if (Math.abs(ft - s.fly) > EPS) settling = true;
       if (g <= 0) continue;
       ctx.lineWidth = Math.max(0.6, s.wcur * SEAL.thicknessScale * R);
       if (SEAL.formation >= 0.5) {                       // fly-in: whole segment slides along its stripe into place
@@ -396,8 +417,10 @@
       var dft = 0;
       if (P && K >= 1) { var nearD = smooth(1 - Math.abs(pv - rowsV[d.ri]) / H.flyRadius); dft = hoverShift(d.ri, d.x * D[0] + d.y * D[1], on * edge * H.fly * lerp(H.flyFar, H.flyNear, nearD), pu); }
       d.fly = (d.fly || 0) + (dft - (d.fly || 0)) * k;
+      if (Math.abs(dft - d.fly) > EPS) settling = true;
       x += d.fly * D[0] * R; y -= d.fly * D[1] * R;
       if (!dtx) continue;
+      if (dtx.alpha < 1 || dtx.text !== d.t) settling = true;   // matrix flicker / count-up still running → keep animating
       ctx.globalAlpha = dtx.alpha; ctx.fillText(dtx.text, x, y);
     }
 
@@ -412,16 +435,31 @@
     ctx.globalAlpha = 1;
   }
 
+  /* Render on demand (v22). A frame is drawn only when something can have changed: the scroll, the
+     pointer / tilt, a knob (the tuner calls SEAL_INVALIDATE), the layout, a font or the wordmark
+     arriving, or a smoothed value still travelling toward its target (`settling`). At rest — the
+     normal state once the seal has landed — nothing is drawn at all, which is what keeps phones cool;
+     before, the full canvas was cleared and redrawn 60 times a second forever. */
+  var dirty = true, lastScrollY = -1, lastPointerKey = '';
+  function pointerKey() {
+    return (pointer ? pointer[0] + ',' + pointer[1] : '-') + '|' + (tilt ? tilt[0].toFixed(3) + ',' + tilt[1].toFixed(3) : '-') + '|' + (touchUntil ? 1 : 0);
+  }
+  window.SEAL_INVALIDATE = function () { dirty = true; };
   function frame(now) {
     if (totalVH() !== lastTotalVH || SEAL.quality.dprMax !== lastDpr || SEAL.quality.softBlur !== lastBlur) {
       lastTotalVH = totalVH(); lastDpr = SEAL.quality.dprMax; lastBlur = SEAL.quality.softBlur; layout();
     }
-    draw(now);
+    var pk = pointerKey(), sy = window.scrollY;
+    if (sy !== lastScrollY || pk !== lastPointerKey) { dirty = true; lastScrollY = sy; lastPointerKey = pk; }
+    if (dirty || settling) { dirty = false; draw(now); }
     requestAnimationFrame(frame);
   }
   layout();
+  // the address bar collapsing / expanding on phones fires resize with the same width: only the canvas
+  // backing store follows it (inside layout, via `ch`); vh and the spacer stay put (probe = 100vh)
   window.addEventListener('resize', layout);
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { /* first frames may use the fallback font; the loop redraws */ });
+  wordmark.onload = function () { dirty = true; };
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { dirty = true; });   // first frames may have used the fallback font
   requestAnimationFrame(frame);
 
   /* auto-play: the page is a stage at T = 0, so unless the visitor scrolls within half a second we

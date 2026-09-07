@@ -1,0 +1,16 @@
+/* Page shell — the one wrapper around everything inside <body> of every experiment page.
+   Purpose: keep the layout viewport at the device width on phones. Anything an effect pushes past
+   the right edge (parallax risers, fly-ins, off-screen stages) would otherwise widen the document,
+   and mobile browsers react by zooming the whole page out and back in as the content moves.
+   `clip` rather than `hidden`: the shell is NOT a scroll container, so position: sticky and scroll
+   anchoring inside it keep working. Deliberately no `hidden` fallback: a browser without `clip`
+   (pre-2022) simply gets no clipping, whereas `hidden` would turn the shell into a scroll container
+   and break the sticky video stages of experiment 1.
+   Fixed elements (header nav, canvases, tuner) are not affected — their containing block is the
+   viewport, not the shell. No z-index here: the shell must not create a stacking context. */
+.page-shell {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+}

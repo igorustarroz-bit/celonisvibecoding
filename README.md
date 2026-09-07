@@ -32,7 +32,8 @@ Index of experiments: [`index.html`](./index.html)
   `Concept-Video-Scroll/`, `3d-book/`, `celosphere/`). `3d-globe/` was named `celonis-home/` until 2026-09-03.
 - `experiments/` also holds what is shared: `nav-fx.js` (the common nav effect),
   `lib/` (three.js r147 + post-processing, GSAP 3.5.1 + ScrollTrigger, the placeholder
-  spritemap, Poppins and IBM Plex Mono, the inert forms, the gyroscope parallax for phones),
+  spritemap, Poppins and IBM Plex Mono, the inert forms, the gyroscope parallax for phones,
+  the `page-shell.css` wrapper every experiment page uses to keep phones from zooming),
   `clean-saved-page.py` (the anti-impersonation cleanup as a script), `bundle-assets.py`
   (images → data-URI bundle so WebGL textures also work from `file://`) and
   **all** the `claude_*_context.md` engineering notes, one per topic, kept together at
