@@ -206,6 +206,11 @@ Two more phone rules learned with the same bug, for any scroll-driven effect:
   keep it in the flow and correct it with a `transform` computed from `getBoundingClientRect()`
   each frame: the compositor scrolls first, the main thread corrects a frame later, and the
   element visibly vibrates against anything fixed next to it (celosphere v23, `fixTitle()`).
+- Before driving any element of the saved page frame by frame (inline `transform` / `opacity`
+  from the scroll), grep the saved CSS for `transition` and `animation` on it and its parents
+  and switch them off with `!important` while the effect owns it. A `transition: transform
+  300ms ease` left on makes every value arrive 300 ms late and eased — the element trails the
+  scroll and looks like it has an acceleration of its own (celosphere v24, the countdown card).
 
 Verification (headless Chromium, `isMobile: true`, 390 px): `document.documentElement.scrollWidth
 === innerWidth` at every point of the sequence, and the draw count over 1 s at rest is 0.

@@ -4,7 +4,7 @@
 > to `experiments/`. Process reference: `claude_newexperiment_context.md`. Anti-phishing
 > rules: `claude_antiphishing_context.md`.
 
-**Status (2026-09-07): FINISHED and PUBLISHED** (v23 of `seal-knit.js`, Igor's approved values; v22/v23 = the
+**Status (2026-09-07): FINISHED and PUBLISHED** (v24 of `seal-knit.js`, Igor's approved values; v22–v24 = the
 phone and scroll-steadiness fixes below, no visual change).
 Published at `https://igorustarroz-bit.github.io/celonisvibecoding/experiments/celosphere/index.html`
 and linked from the root index as Experiment 5. Igor's rule for this experiment while it was
@@ -205,7 +205,7 @@ labelled render and checked against the artwork. Circle = the stripes' bounding 
 - The "Celosphere 26" wordmark is a crop of the PNG (1400 px wide, PNG data URI, 45 KB) with
   its box relative to the circle — the original artwork, not text.
 
-## 7. `seal-knit.js` (v23) + `seal-tuner.js` (v17) — the effect
+## 7. `seal-knit.js` (v24) + `seal-tuner.js` (v17) — the effect
 
 - A spacer `#seal-intro-space` (`introVH` = 1.5 viewport heights, `margin: 0`, black
   background — the page's base colour is white, only the hero wrapper is dark) is inserted at
@@ -374,8 +374,22 @@ labelled render and checked against the artwork. Circle = the stripes' bounding 
   scroll steps in hold 2 (desktop 318 px, phone 89 px), final inline style empty at T = 1. Lesson for
   the process doc: **a scroll-linked element that must stay still on screen has to be `fixed` (or
   `sticky`), never a flow element corrected with a transform each frame.**
+- **v24 — the countdown card trailed the scroll (2026-09-08).** Igor: "I don't like that the 84
+  days card has an acceleration of its own … maybe it's a delay: it should feel like everything
+  else on screen, just advancing and reversing with the scroll." Cause: the site's own CSS eases
+  the card — `.square-value .square-wrapper { transition: transform var(--fnd-motion-duration-300)
+  ease }` — so every per-frame `translateX` we set arrived 300 ms late, ease-out included. Fix: a
+  `.seal-stage` rule sets `transition: none !important` on the four driven hero elements (h1,
+  `.extra-section`, `.square-wrapper`, `.buttons-container`) for the duration of the stage; the
+  class drops at T = 1 and the site's transitions come back untouched. Verified: after a scroll
+  step the card's rendered X equals the inline translate on the very next frame and does not move
+  afterwards. Lesson: **before driving a saved-page element frame by frame, grep the saved CSS for
+  `transition` on it (and its parents) and switch it off while driving — the entrance
+  `animation`s were already disabled for the same reason.**
 
 ## 8. Publish log and next steps
+
+Fourth push, 2026-09-08 (v24): card follows the scroll 1:1 (site transition off during the stage).
 
 Third push, 2026-09-08 (v23): fixed title on the stage — see §7.
 

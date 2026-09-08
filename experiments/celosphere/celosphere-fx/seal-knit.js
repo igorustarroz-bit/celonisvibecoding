@@ -227,6 +227,10 @@
   var heroCSS = document.createElement('style');
   heroCSS.textContent = '.hero-landing h1 span,.hero-landing .extra-section,.hero-landing .button-container,.hero-landing .buttons-container{animation:none!important;opacity:1;transform:none}' +
     '.hero-landing h1,.hero-landing .extra-section,.hero-landing .square-wrapper.rotation-ready,.hero-landing .buttons-container{will-change:transform,opacity}' +
+    // the site eases every transform change on the countdown card (`.square-wrapper{transition:transform
+    // 300ms ease}`), so our per-frame values arrived 300 ms late — the card trailed the scroll (Igor, v24:
+    // "it should feel like everything else on screen, just advancing and reversing with the scroll")
+    '.seal-stage .hero-landing h1,.seal-stage .hero-landing .extra-section,.seal-stage .hero-landing .square-wrapper,.seal-stage .hero-landing .buttons-container{transition:none!important}' +
     // while the sequence runs (body.seal-stage): the hero content must be able to leave its box (the
     // title sits in the middle of the viewport in frame 2, far above the hero) and must paint ABOVE
     // the fixed canvas (z-index 8) — the black stage stays under the text, the dotted background of
