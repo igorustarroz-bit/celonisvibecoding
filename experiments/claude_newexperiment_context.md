@@ -200,6 +200,13 @@ Two more phone rules learned with the same bug, for any scroll-driven effect:
   is still travelling toward its target (`settling` flag). At rest: zero draws
   (`seal-knit.js` v22, `frame()`).
 
+- An element that must stay STILL on screen while the page scrolls (a title parked at the
+  viewport centre, a caption pinned next to a fixed canvas) must be `position: fixed` (or
+  `sticky`) for that stretch, with a same-size placeholder holding its room in the flow. Never
+  keep it in the flow and correct it with a `transform` computed from `getBoundingClientRect()`
+  each frame: the compositor scrolls first, the main thread corrects a frame later, and the
+  element visibly vibrates against anything fixed next to it (celosphere v23, `fixTitle()`).
+
 Verification (headless Chromium, `isMobile: true`, 390 px): `document.documentElement.scrollWidth
 === innerWidth` at every point of the sequence, and the draw count over 1 s at rest is 0.
 

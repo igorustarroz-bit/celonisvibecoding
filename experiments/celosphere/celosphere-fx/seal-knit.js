@@ -30,6 +30,10 @@
      travelling; at rest nothing is drawn. The viewport height used for the spacer and the
      geometry is the stable 100vh (a probe element), not innerHeight, so the address bar
      collapsing on phones no longer resizes the sequence mid-scroll.
+   - While the title is on the stage (frames 2–3) it is position: fixed with a same-size
+     placeholder holding its room in the hero (v23): a fixed element is not moved by the
+     compositor scroll, so it stays as still as the canvas (a per-frame translate lagged one
+     frame behind the scroll and made the title vibrate).
 
    Tuning: every knob lives on window.SEAL (read every frame) — see seal-tuner.js.
    window.SEAL_INFO() reports what is really in effect (dpr, canvas px, blur).
@@ -230,31 +234,54 @@
     '.seal-stage .hero-landing{overflow:visible;position:relative;z-index:9}';
   document.head.appendChild(heroCSS);
   var PX = SEAL.parallax;
-  var title = hero ? hero.querySelector('h1') : null, titleDX = 0, titleDY = 0;
+  var title = hero ? hero.querySelector('h1') : null;
   var risers = hero ? [
     { el: hero.querySelector('.extra-section'), dist: 'extraDist', speed: 'extraSpeed' },
     { el: hero.querySelector('.square-wrapper.rotation-ready'), dist: 'cardDist', speed: 'cardSpeed', axis: 'x' },
     { el: hero.querySelector('.buttons-container'), dist: 'ctaDist', speed: 'ctaSpeed' }
   ].filter(function (r) { return r.el; }) : [];
-  /* s = shift progress (0..1), u = settle progress (0..1). The title is positioned in viewport
-     terms: its natural (untransformed) viewport rect is the live rect minus the translate we
-     applied last frame, so layout changes and the scroll are always accounted for. */
+  /* The title while it is on the stage (frames 2–3) is taken OUT of the page flow and made
+     position: fixed (v23). Until v22 it stayed in the flow and was pushed to the viewport centre with
+     a per-frame translate computed from getBoundingClientRect: the compositor scrolls the document
+     first and the main thread corrects the transform a frame later, so during a scroll the title
+     moved with the page and snapped back every frame — Igor: "the seal stays still but the title
+     vibrates and bounces". A fixed element is not moved by the scroll at all, exactly like the
+     canvas, so it is rock steady; a placeholder of the same size keeps the hero layout (and thus
+     the natural slot the title returns to) unchanged. */
+  var titleHold = null;   // the placeholder that keeps the title's room in the hero while it is fixed
+  if (title) { titleHold = document.createElement('div'); titleHold.style.display = 'none'; titleHold.setAttribute('aria-hidden', 'true'); title.parentNode.insertBefore(titleHold, title); }
+  var titleFixed = false;
+  function fixTitle(on, r) {                  // r = the title's natural rect (only read when switching on)
+    if (on === titleFixed) return;
+    titleFixed = on;
+    if (on) {
+      var cs = getComputedStyle(title);
+      titleHold.style.cssText = 'display:block;height:' + r.height + 'px;margin:' + cs.marginTop + ' ' + cs.marginRight + ' ' + cs.marginBottom + ' ' + cs.marginLeft + ';';
+      title.style.position = 'fixed'; title.style.left = r.left + 'px'; title.style.width = r.width + 'px'; title.style.margin = '0';
+    } else {
+      titleHold.style.display = 'none';
+      title.style.position = ''; title.style.left = ''; title.style.top = ''; title.style.width = ''; title.style.margin = '';
+    }
+  }
+  /* s = shift progress (0..1), u = settle progress (0..1). */
   function parallax(T, s, u) {
     if (title) {
-      if (T >= 1 || T < marks().shiftStart) { title.style.transform = ''; title.style.opacity = T >= 1 ? '' : '0'; titleDX = titleDY = 0; }
+      if (T >= 1 || T < marks().shiftStart) { fixTitle(false); title.style.opacity = T >= 1 ? '' : '0'; }
       else {
-        var r = title.getBoundingClientRect(), natX = r.left - titleDX, natY = r.top - titleDY;
         var mobile = vw < 768;
+        // the natural slot: the placeholder while the title is fixed, the title itself otherwise
+        var r = (titleFixed ? titleHold : title).getBoundingClientRect(), natY = r.top;
         var wantY = mobile ? vh * SEAL.titleYMobile - r.height / 2 : vh / 2 - r.height / 2;   // frame 2: vertically centred
-        var dx, dy, op;
+        var top, op;
         if (u <= 0) {                                    // shift: rise from below the viewport to the centred position
-          var e2 = smooth(s);
-          dx = 0; dy = lerp(vh + 40 - natY, wantY - natY, e2); op = clamp(s / PX.titleFade, 0, 1);
-        } else {                                         // settle: stays vertically centred until its layout slot
-          dx = 0; dy = Math.min(wantY, natY) - natY; op = 1;   // scrolls up to meet it, then rides with the page (never moves down)
+          fixTitle(true, r);
+          top = lerp(vh + 40, wantY, smooth(s)); op = clamp(s / PX.titleFade, 0, 1);
+        } else {                                         // settle: stays centred until its slot scrolls up to meet it,
+          op = 1;                                        // then goes back into the flow and rides with the page (never moves down)
+          if (natY <= wantY) { fixTitle(false); top = null; }
+          else { fixTitle(true, r); top = wantY; }
         }
-        titleDX = dx; titleDY = dy;
-        title.style.transform = 'translate(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px)';
+        if (top !== null && top !== undefined) title.style.top = top.toFixed(1) + 'px';
         title.style.opacity = op.toFixed(3);
       }
     }
@@ -294,6 +321,7 @@
     canvas.style.filter = SEAL.quality.softBlur > 0 ? 'blur(' + SEAL.quality.softBlur + 'px)' : '';
     spacerH = REDUCED ? 0 : Math.round(vh * totalVH());
     spacer.style.height = spacerH + 'px';
+    if (titleFixed) fixTitle(false);          // its left/width were measured for the old layout; the next frame re-fixes it
     dirty = true;
   }
   function totalVH() { return SEAL.knitVH + SEAL.hold1VH + SEAL.shiftVH + SEAL.hold2VH + SEAL.settleVH; }

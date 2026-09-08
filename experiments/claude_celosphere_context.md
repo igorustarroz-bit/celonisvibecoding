@@ -4,8 +4,8 @@
 > to `experiments/`. Process reference: `claude_newexperiment_context.md`. Anti-phishing
 > rules: `claude_antiphishing_context.md`.
 
-**Status (2026-09-07): FINISHED and PUBLISHED** (v22 of `seal-knit.js`, Igor's approved values; v22 = the
-phone fixes below, no visual change).
+**Status (2026-09-07): FINISHED and PUBLISHED** (v23 of `seal-knit.js`, Igor's approved values; v22/v23 = the
+phone and scroll-steadiness fixes below, no visual change).
 Published at `https://igorustarroz-bit.github.io/celonisvibecoding/experiments/celosphere/index.html`
 and linked from the root index as Experiment 5. Igor's rule for this experiment while it was
 being built was "nothing goes to GitHub until it is finished locally"; it was finished and pushed
@@ -205,7 +205,7 @@ labelled render and checked against the artwork. Circle = the stripes' bounding 
 - The "Celosphere 26" wordmark is a crop of the PNG (1400 px wide, PNG data URI, 45 KB) with
   its box relative to the circle — the original artwork, not text.
 
-## 7. `seal-knit.js` (v22) + `seal-tuner.js` (v17) — the effect
+## 7. `seal-knit.js` (v23) + `seal-tuner.js` (v17) — the effect
 
 - A spacer `#seal-intro-space` (`introVH` = 1.5 viewport heights, `margin: 0`, black
   background — the page's base colour is white, only the hero wrapper is dark) is inserted at
@@ -358,8 +358,26 @@ labelled render and checked against the artwork. Circle = the stripes' bounding 
      the tilt feature; off-screen the draw returns after a `clearRect`.
   Also removed in the same pass: the Qualified `<q-root>` tails after `</body>` in the older
   experiments (see the anti-phishing doc §6).
+- **v23 — the title no longer vibrates while scrolling (2026-09-08).** Igor, on frame 2: "the
+  circle stays still and elegant but the title vibrates and bounces". Cause: the title stayed in
+  the page flow and was pushed to the viewport centre with a per-frame `translate` computed from
+  `getBoundingClientRect()`; the compositor scrolls the document first and the main thread corrects
+  the transform one frame later, so during a scroll the title moved with the page and snapped back
+  every frame (the canvas is `position: fixed`, hence untouched by the scroll, hence still). Fix:
+  while the title is on the stage (`shiftStart ≤ T < 1` and its natural slot is still below the
+  centre) it is `position: fixed` (`left`/`width` copied from its natural rect, `margin: 0`, `top` =
+  the rise during the shift, then `wantY`), and a same-size placeholder `<div>` (height + margins)
+  keeps its room in the hero so the layout and the slot it returns to are unchanged. In the settle,
+  the moment the placeholder's top reaches `wantY` the title goes back into the flow and rides with
+  the page (no jump: same position at the switch); scrolling back up re-fixes it. `layout()` unfixes
+  it on resize so `left`/`width` are re-measured. Verified: top constant to the pixel through five
+  scroll steps in hold 2 (desktop 318 px, phone 89 px), final inline style empty at T = 1. Lesson for
+  the process doc: **a scroll-linked element that must stay still on screen has to be `fixed` (or
+  `sticky`), never a flow element corrected with a transform each frame.**
 
 ## 8. Publish log and next steps
+
+Third push, 2026-09-08 (v23): fixed title on the stage — see §7.
 
 Second push, 2026-09-07 (v22): `page-shell` on all 6 experiment pages + `lib/page-shell.css`,
 `seal-knit.js` v22 / `seal-tuner.js` v17, process doc §4b, q-root tails removed in older pages.
