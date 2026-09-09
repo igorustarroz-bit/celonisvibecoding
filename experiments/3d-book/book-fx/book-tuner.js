@@ -13,9 +13,18 @@
     if (document.readyState !== 'loading') fn();
     else document.addEventListener('DOMContentLoaded', fn);
   }
-  ready(function init() {
+  /* 2026-09-09 — rule 12 (see experiments/claude_antiphishing_context.md §7):
+     a published page that replicates the client's site must contain no
+     data-entry element at all, and this dev panel is built from <input
+     type="range"> sliders. It is therefore no longer created on load. Add
+     ?tuner to the URL, or press T on the page, to build and show it; a plain
+     visit never puts a single input in the DOM. */
+  var built = false;
+  function build() {
     var T = window.BOOK;
-    if (!T) { setTimeout(init, 300); return; }
+    if (!T) { setTimeout(build, 300); return; }
+    if (built) return;
+    built = true;
 
     var css = document.createElement('style');
     css.textContent = [
@@ -70,10 +79,6 @@
     function hide() { panel.style.display = 'none'; }
     function show() { panel.style.display = ''; }
     window.BOOK_TUNER = { show: show, hide: hide, toggle: function () { panel.style.display === 'none' ? show() : hide(); } };
-    document.addEventListener('keydown', function (e) {
-      if ((e.key === 't' || e.key === 'T') && !e.metaKey && !e.ctrlKey && !e.altKey &&
-          !/INPUT|TEXTAREA|SELECT/.test((e.target && e.target.tagName) || '')) window.BOOK_TUNER.toggle();
-    });
 
     function get(path) { return path.split('.').reduce(function (o, k) { return o[k]; }, T); }
     function set(path, val) {
@@ -197,5 +202,16 @@
       })(T, DEFAULTS);
       updaters.forEach(function (f) { f(); });
     });
+  }
+
+  ready(function () {
+    document.addEventListener('keydown', function (e) {
+      if ((e.key === 't' || e.key === 'T') && !e.metaKey && !e.ctrlKey && !e.altKey &&
+          !/INPUT|TEXTAREA|SELECT/.test((e.target && e.target.tagName) || '')) {
+        if (!built) build();
+        else if (window.BOOK_TUNER) window.BOOK_TUNER.toggle();
+      }
+    });
+    if (/[?&]tuner/.test(location.search)) build();
   });
 })();

@@ -449,6 +449,25 @@ the page.** The README has been rewritten to describe what is actually true.
 `lib/inert-form.js` is v2 — no input handling left, only the buttons, plus a safety net that
 strips and warns about any real field that ever reappears inside a `.inert-form`.
 
+## A fourth signal, found in the browser after the fix was pushed
+
+The static audit was clean, but `document.querySelectorAll('input,select,textarea,form')`
+on the *published* celosphere page still returned **59** elements. They were not in the HTML:
+the `SEAL TUNER` dev panel (`celosphere-fx/seal-tuner.js`) builds itself on load and is made
+of 59 `<input type="range">` sliders, sitting `position: fixed`, `z-index: 99999`, visible to
+anyone who opens the page. The same panel ships on `3d-book/index.html` (`book-tuner.js`) and
+`datacore/index3d.html` (`datacore-tuner.js`).
+
+Range sliders are not a lead-capture pattern, so they are a weak phishing signal on their own
+— but they are data-entry elements, rule 12 says none, and a visible engineering panel on a
+page shown to a client is wrong for its own reasons. All three tuners now build **on demand
+only**: add `?tuner` to the URL, or press `T` on the page. A plain visit puts no input in the
+DOM.
+
+The lesson is the one that keeps repeating in a new form: **the audit script reads the file,
+the classifier renders the page.** Both checks are needed, and the browser one has to be run
+on the published URL, not on the source.
+
 ## New mandatory rules
 
 **Rule 12 — no data-entry elements on a client replica.** A page that reproduces a client's
