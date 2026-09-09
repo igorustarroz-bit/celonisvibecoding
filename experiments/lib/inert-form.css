@@ -46,3 +46,106 @@
 .inert-form .footer-newsletter__submit:hover{background-color:var(--fnd-color-text-high)}
 .inert-form .footer-newsletter__field .description a{color:inherit;text-decoration:underline}
 @media (max-width:1199px){.inert-form .form-field--half-width{max-width:calc(100% - 1px)}}
+
+/* ------------------------------------------------------------------ *
+ * v2 — 2026-09-09.
+ *
+ * Why: the site was flagged as deceptive a second time. The v1 replicas
+ * removed the FUNCTION of the forms (no <form>, no action, no name, no
+ * email/password types) but kept real <input> elements you could type
+ * into. Google's social-engineering classifier is structural and visual,
+ * not functional: a page that renders as a known brand and shows fields
+ * asking for name, work email, company, city and phone is the signature,
+ * whether or not anything is ever submitted.
+ *
+ * v2 therefore contains no data-entry element at all. Every <input>,
+ * <select> and <textarea> has been replaced by a <div class="inert-field">
+ * or <span class="inert-check"> that carries the same classes, so the
+ * layout is unchanged and the prototype still reads correctly, but the
+ * page offers nowhere to type. The rules below restate the v1 input
+ * styling for those elements.
+ *
+ * Do not reintroduce <input> on a page that replicates a client site.
+ * ------------------------------------------------------------------ */
+
+/* text field look-alike (was: .inert-form input.text, select.select) */
+.inert-form .inert-field.text,
+.inert-form .inert-field--select {
+  font: inherit;
+  font-size: var(--fnd-typography-paragraph-l-font-size);
+  line-height: var(--fnd-typography-paragraph-l-line-height);
+  width: 100%;
+  color: var(--fnd-color-text-high);
+  border-radius: var(--fnd-radius-m);
+  border: 1px solid var(--fnd-color-border-mid);
+  background-color: var(--fnd-color-background-base);
+  height: var(--form-input-size);
+  padding: var(--fnd-spacing-01) var(--fnd-spacing-04);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  user-select: none;
+}
+
+.inert-form .inert-field--area {
+  height: auto;
+  min-height: calc(var(--form-input-size) * 2);
+  align-items: flex-start;
+  padding-block: var(--fnd-spacing-02);
+}
+
+.inert-form .inert-field--select {
+  --background-size: 1.5em;
+  background-image: var(--form-icon-chevron-down);
+  background-repeat: no-repeat;
+  background-size: var(--background-size);
+  background-position: calc(100% - var(--background-size) / 2) 50%;
+  padding-inline-end: calc(var(--background-size) * 2);
+}
+
+/* the resting text that used to be a placeholder */
+.inert-form .inert-field__ph {
+  color: var(--fnd-color-text-mid);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* checkbox look-alike (was: .inert-form input[type=checkbox]) */
+.inert-form .inert-check {
+  --form-checkbox-size: 1.25rem;
+  width: var(--form-checkbox-size);
+  height: var(--form-checkbox-size);
+  margin: 2px 0 0;
+  border: 1px solid var(--fnd-color-border-mid);
+  border-radius: var(--fnd-radius-s);
+  background: transparent;
+  flex-shrink: 0;
+  display: inline-block;
+  position: relative;
+}
+
+.inert-form .inert-check ~ label {
+  font-size: var(--fnd-typography-paragraph-m-font-size);
+  line-height: var(--fnd-typography-paragraph-m-line-height);
+  color: var(--fnd-color-text-high);
+  text-wrap: pretty;
+  margin: 0;
+  cursor: default;
+}
+
+/* footer newsletter variant */
+.inert-form .footer-newsletter__field .inert-field.text {
+  padding-inline-end: var(--form-input-size);
+}
+
+/* The saved pages also carry the site's own header search box inside the
+   country-selector dialog. It is replaced by the same look-alike, and it
+   is not scoped under .inert-form, so it gets its own rule. */
+.inert-field.search-input {
+  display: flex;
+  align-items: center;
+  min-height: 3rem;
+  user-select: none;
+}
