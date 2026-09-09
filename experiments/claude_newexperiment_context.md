@@ -84,18 +84,57 @@ order of risk:
 4. Every `<a href>` starting with `http`, `//` or `/` → `href="#"`. The
    **login and signup ones first** (copied branding + login link = textbook phishing).
 5. Remove form and chat iframes, and **all** analytics scripts and pixels, including
-   inline snippets. Keep `aem.js`, `scripts.js`, `main.*.js`, `*.chunk.js` (layout,
-   not tracking). Where the page had a form, put back an **inert visual replica**
-   (`../lib/inert-form.css` + `../lib/inert-form.js`, markup as in `3d-book/`): the
-   form must look and feel real but have no `<form>`, no `action`, no `name`s, no
-   email/password types — Igor's rule, details in the anti-phishing doc rule 9.
+   inline snippets. Keep `aem.js`, `scripts.js` (layout, not tracking) — but NOT
+   `main.*.js` or `*.chunk.js`: those are the TikTok pixel and the Qualtrics bundle
+   (rule 11b, 2026-09-04). Where the page had a form, put back a **static visual
+   replica** (`../lib/inert-form.css?v=2` + `../lib/inert-form.js?v=2`, markup as in
+   `3d-book/`).
+
+   **Rule 12 (mandatory since 2026-09-09) — no data-entry element at all.** The replica
+   contains no `<form>`, `<input>`, `<select>` or `<textarea>`. Not disabled, not
+   read-only, not with `name` removed: the classifier is structural and visual, and a
+   brand replica showing First Name / Work Email / Company / City / Phone matches the
+   phishing pattern whether or not anything can be submitted. This is what got the site
+   flagged a second time; the old "inert but typable" rule 9 is dead. Fields are
+   `<div class="inert-field">` / `<span class="inert-check">` — run
+   `python3 ../defuse-inputs.py` from the repo root and it converts them for you.
+   **This includes dev panels**: the tuner sliders are `<input type="range">`, so a
+   tuner must build on demand only (`?tuner` in the URL, or the `T` key), never on load.
+   If a prototype genuinely needs typing, build it on a page that does not carry the
+   client's identity.
 6. Tracking files are NOT deleted from disk: `git rm --cached` + an explicit rule in
    `.gitignore` (the `.gitignore` paths carry the prefix
    `/experiments/<name>/...`; renaming or moving a folder means updating them).
 7. Do **not** put a banner on the experiment page; the disclaimer goes only in the index.
 
-Plus the **verification sweep** from section 4 of that doc before every push, and the
-browser check that all network requests are same-origin.
+**Rule 13 (mandatory since 2026-09-09) — zero cross-origin requests, and nothing that
+names the source.** Every request the published page makes must be same-origin: no CDN,
+no font service, and in particular nothing fetched from the brand's own domain (the 211
+`<use href="https://www.celonis.com/…spritemap.svg#…">` in `datacore/` sat on the
+"optional, not a real signal" list for five days and were part of the second flag).
+Strip the `<!-- saved from url=(…) -->` comment Chrome writes as the second line of every
+"Webpage, Complete" save. The saved `fonts.css` must point at
+`../../lib/fonts/poppins-latin-400-normal.woff2`, not at the brand's `/src/assets/fonts/`.
+
+Verification, both halves, every time:
+
+```bash
+python3 experiments/defuse-inputs.py --report   # file-level audit, all tracked pages
+```
+
+then, in a real browser **on the published URL** (with a `?nocache=` query string):
+
+```js
+document.querySelectorAll('input,select,textarea,form').length          // must be 0
+[...new Set(performance.getEntriesByType('resource')
+     .map(e => new URL(e.name).origin))]                                // must be [location.origin]
+```
+
+The audit script reads the file; the classifier renders the page. The tuner panels were
+invisible to every file-level check and only the browser found them. Run both over
+**every** tracked page, not only the new one.
+
+Plus the **verification sweep** from section 4 of the anti-phishing doc before every push.
 
 ## 4. Apply nav-fx
 
@@ -275,7 +314,11 @@ to `experiments/`.
 ## Final checklist before saying "published"
 
 - [ ] Anti-phishing sweep clean (section 4 of the anti-phishing doc).
-- [ ] Network requests of the published page: all same-origin.
+- [ ] `python3 experiments/defuse-inputs.py --report` clean over every tracked page.
+- [ ] On the PUBLISHED url, in a real browser:
+      `document.querySelectorAll('input,select,textarea,form').length === 0` (rule 12)
+      and every `performance.getEntriesByType('resource')` entry same-origin (rule 13).
+- [ ] Any tuner / dev panel builds on demand only (`?tuner` or the `T` key), never on load.
 - [ ] `<script src="../nav-fx.js?v=N">` on every page in the folder, with the `?v=`
       bumped if the JS was touched.
 - [ ] `<div class="page-shell">` around the whole body + `../lib/page-shell.css` (section 4b);
