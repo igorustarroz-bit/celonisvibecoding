@@ -368,3 +368,143 @@ pages (`3d-globe`, `3d-book`, `datacore` ×4, `Concept-Video-Scroll` ×4): `<q-f
 googleapis` over EVERY tracked page, not only the new one. Left as is: a `cdn.cookielaw.org` logo
 URL inside the saved OneTrust CSS (`.ot-floating-button__front`), which only loads if that element
 exists — it does not on our pages.
+
+---
+
+# §7 — Second Safe Browsing flag, 2026-09-09
+
+## What happened
+
+Google flagged `igorustarroz-bit.github.io/celonisvibecoding/` as deceptive again, six days
+after the first warning was lifted (2026-09-03) and one day after experiment 5
+(`celosphere/`) was published. This is a **second offence on the same host**, which matters:
+a host with a repeat classification is slower and harder to clear than a first-timer.
+
+## Root cause: the inert forms were the wrong fix
+
+The first cleanup removed the *identity* signals (canonical, `og:*`, JSON-LD, indexability,
+outbound links to the brand's login and signup) and the *functional* ones (real Pardot
+forms, chat, analytics, pixels). The forms were then reintroduced as "inert replicas": real
+`<input>` elements that could be typed into, but with no `<form>`, no `action`, no `name`,
+and no `email`/`password` input type. That was written up as rule 9 and treated as safe.
+
+It is not safe. **Google's social-engineering classifier is structural and visual, not
+functional.** It does not need to find a submit handler. A page that renders as a
+recognisable brand and contains fields labelled First Name / Last Name / Work Email /
+Company / City / Phone, with a "Register now" button, matches the pattern regardless of
+where the data would go. Removing `name` attributes hides the fields from a form
+serialiser; it does not hide them from a DOM scan or a screenshot.
+
+Experiment 5 turned a small residual signal into a loud one. Counts at the moment of the
+flag, across the tracked pages:
+
+| Page | data-entry elements | notes |
+|---|---|---|
+| `celosphere/index.html` + `original.html` | 37 each | 3 registration forms (name, work email, company, city, phone, opt-in), newsletter field, "Register now" |
+| `3d-book/index.html` + `original.html` | 13 each | gated-download form + newsletter |
+| every other cloned page | 1 each | the site's own region-search box |
+
+## Three other signals that had survived every previous sweep
+
+1. **`<!-- saved from url=(0034)https://www.celonis.com/celosphere -->`** — Chrome writes
+   this as the *second line* of every "Webpage, Complete" save. It is a machine-readable
+   declaration, in the first bytes of the document, that the file is a copy of the brand's
+   page. No earlier cleanup touched it. It was present on all 16 cloned pages.
+2. **211 live hotlinks to the brand's own domain** in `datacore/index.html` and
+   `index3d.html`: `<use href="https://www.celonis.com/dist/assets/spritemap.svg#…">`.
+   Known since 2026-09-04 and filed as "optional — not a phishing signal". Wrong call: a
+   replica page that fetches its icons live from the impersonated domain is a textbook
+   phishing-kit behaviour, and it made the pages the only ones on the site with
+   cross-origin requests.
+3. **`fonts.googleapis.com`** in the root `index.html` (two `<link>`s), and the brand's own
+   `Poppins-Regular.woff2` referenced from an inline `@font-face` in the datacore pages.
+
+## The README was making a false claim
+
+`README.md` stated that "all newsletter / lead-capture forms and chat widgets have been
+removed" while the typable replicas were live. The lesson from the 2026-09-03 meta-tag
+episode applies again, harder: **a reassuring claim that is false is a liability, and a
+human reviewer who checks one bullet and finds 23 input fields will not trust the rest of
+the page.** The README has been rewritten to describe what is actually true.
+
+## What was done
+
+`experiments/defuse-inputs.py` (new, idempotent, run from the repo root):
+
+- replaces every `<input>`, `<select>` and `<textarea>` in the tracked HTML files with
+  non-interactive look-alikes — `<div class="inert-field">`, `<span class="inert-check">` —
+  carrying the same classes, so the layout is unchanged and the prototype still reads as
+  intended, but the page offers nowhere to type. Hidden inputs are deleted outright;
+- strips the `saved from url` comment;
+- rewrites every absolute brand URL: `<use href>` and `@font-face` to root-relative (which
+  `lib/sprite.js` already handles, and where a same-origin 404 is harmless and intentional),
+  `<a href>` to `#`, `src`/`srcset`/`poster` to relative;
+- replaces the Google Fonts links in the root index with `experiments/lib/poppins.css`;
+- writes `robots.txt` with `Disallow: /`;
+- has a `--report` mode that audits every tracked page for data-entry elements, absolute
+  brand URLs, external assets, `canonical`, `og:*`, JSON-LD, `<form>`, Qualified/Bing
+  leftovers and a missing `noindex`.
+
+`lib/inert-form.css` gained a v2 block restating the input styling for the look-alikes;
+`lib/inert-form.js` is v2 — no input handling left, only the buttons, plus a safety net that
+strips and warns about any real field that ever reappears inside a `.inert-form`.
+
+## New mandatory rules
+
+**Rule 12 — no data-entry elements on a client replica.** A page that reproduces a client's
+visual identity contains no `<form>`, `<input>`, `<select>` or `<textarea>`. Not even
+disabled, not even read-only, not even with `name` removed. The forms are rendered as static
+look-alikes so the composition can still be judged. If a prototype genuinely needs typing,
+build it on a page that does not carry the client's identity.
+
+**Rule 13 — zero cross-origin requests, and nothing that names the source.** Every request a
+published page makes must be same-origin: no CDN, no font service, and in particular nothing
+fetched from the brand's own domain. Strip the `saved from url` comment. Run
+`defuse-inputs.py --report` and confirm in a real browser that
+`performance.getEntriesByType('resource')` is 100 % same-origin, over **every** tracked page,
+not just the new one.
+
+## Lessons
+
+- Each cleanup so far fixed the signals we had just learnt about and declared the rest safe.
+  Three times now — the meta descriptions (2026-09-03), the "layout code" that was the TikTok
+  pixel (2026-09-04), the inert forms (today) — the residue was something previously
+  inspected and consciously waved through. **Anything filed as "known, optional, not a real
+  signal" is the first place to look next time.** The datacore sprite hotlinks had been
+  sitting on that list for five days.
+- The classifier does not reason about intent or architecture. Reducing our own reasoning to
+  "but nothing is actually sent" was the error.
+- A checklist only catches what it was written for. The reliable checks are mechanical:
+  the audit script and the browser's resource list.
+
+## Open decision — this host is the real problem
+
+The prototypes are full-page visual replicas of a live commercial site, published
+unauthenticated on a shared, well-crawled host. That is the input the classifier reacts to,
+and every remediation so far has been a way of making the same input slightly less
+suspicious. A third flag is likely.
+
+The alternative was already decided and never built (see the "Open" section of
+`claude/safe-browsing-cleanup.md`): **Cloudflare Pages with Basic Auth in
+`functions/_middleware.js`, on `labs.hanzo.es`, the password in a Cloudflare environment
+variable and never in the repo.** Behind auth there is no crawlable clone, so there is
+nothing to classify; the client sees the prototypes with a password; the GitHub repo stays
+private or keeps only the source. Recommendation: do the remediation above to clear the
+current warning, then move the hosting before publishing experiment 6.
+
+## Order of operations for clearing the warning
+
+1. Run `python3 experiments/defuse-inputs.py` from the repo root; confirm the audit is clean.
+2. Copy the v2 `lib/inert-form.css` block and `lib/inert-form.js`; bump their `?v=` on every
+   page that loads them.
+3. Replace `README.md`.
+4. Serve locally (`python3 -m http.server`) and check every experiment page renders as before
+   and the console is free of errors.
+5. Open each published page in a real browser and confirm every entry of
+   `performance.getEntriesByType('resource')` is same-origin.
+6. Commit and push. **Leave GitHub Pages switched on** — the reviewer has to see the clean
+   pages.
+7. Only then request the review in Search Console (Security Issues → Request Review), and
+   say plainly what the site is, what was found and what was changed. A second request on the
+   same host gets read by a human more carefully than the first; a vague one wastes the round
+   trip.
