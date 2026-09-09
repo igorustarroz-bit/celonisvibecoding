@@ -212,6 +212,6 @@
         else if (window.BOOK_TUNER) window.BOOK_TUNER.toggle();
       }
     });
-    if (/[?&]tuner/.test(location.search)) build();
+    if (/[?&]tuner/.test(location.search)) build();
   });
 })();

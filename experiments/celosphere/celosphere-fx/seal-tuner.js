@@ -197,6 +197,6 @@
         else if (window.SEAL_TUNER) window.SEAL_TUNER.toggle();
       }
     });
-    if (/[?&]tuner/.test(location.search)) build();
+    if (/[?&]tuner/.test(location.search)) build();
   });
 })();

@@ -201,6 +201,6 @@
         else if (window.DATACORE_TUNER) window.DATACORE_TUNER.toggle();
       }
     });
-    if (/[?&]tuner/.test(location.search)) build();
+    if (/[?&]tuner/.test(location.search)) build();
   });
 })();
