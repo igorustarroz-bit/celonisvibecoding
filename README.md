@@ -21,9 +21,10 @@ static visual backdrop so the animation prototypes can be judged in context. The
   `<select>` or `<textarea>` element of any kind, so there is nowhere to type;
 - no login, sign-up, registration or payment flow exists, works or is linked;
 - no data of any kind is collected, transmitted or stored;
-- every page is served with `<meta name="robots" content="noindex,nofollow">`, the site
-  carries `robots.txt` with `Disallow: /`, and the index carries a visible "unofficial
-  prototype" notice.
+- every page is served with `<meta name="robots" content="noindex,nofollow">`, so nothing
+  here is indexed; `robots.txt` deliberately allows crawling, because a crawler has to
+  fetch a page to read that tag;
+- the index carries a visible "unofficial prototype" notice.
 
 All trademarks, logos and brand assets belong to their respective owners and are used
 here only as reference material for design experimentation.

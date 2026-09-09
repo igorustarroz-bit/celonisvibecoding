@@ -429,7 +429,7 @@ otherwise a reviewer fetches three 404s and learns nothing. And the next time a 
 roughly when. Both times the answer was already in Search Console before anyone started
 guessing.
 
-## An open contradiction: `robots.txt` vs `noindex`
+## `robots.txt` vs `noindex` — resolved the same day
 
 The remediation added `robots.txt` with `Disallow: /` while every page also carries
 `<meta name="robots" content="noindex,nofollow">`. Those two fight each other: Googlebot has to
@@ -439,8 +439,12 @@ read — the opposite of what was wanted. It may also slow a reviewer who is try
 the fix; Safe Browsing's own scanners are not bound by `robots.txt`, but nothing is gained by
 making verification harder while a review is pending.
 
-`noindex` is the mechanism that actually works and it is on all 38 pages. The `Disallow: /` is
-the one to reconsider — not decided here, flagged for Igor.
+`noindex` is the mechanism that actually works and it is on all 38 pages. **Igor removed the
+`Disallow` the same day**; `robots.txt` now carries `Allow: /` with a comment saying why, and
+`defuse-inputs.py`'s ROBOTS constant was updated to match so a later run does not put the
+block back. Rule for anything similar: `noindex` and `Disallow` are alternatives, never a
+belt-and-braces pair — pick the one that matches the goal. Here the goal is "crawl it, see
+that it is clean, do not index it".
 
 ## Root cause: the inert forms were the wrong fix (whether or not they were this flag's trigger)
 
@@ -506,7 +510,7 @@ the page.** The README has been rewritten to describe what is actually true.
   `lib/sprite.js` already handles, and where a same-origin 404 is harmless and intentional),
   `<a href>` to `#`, `src`/`srcset`/`poster` to relative;
 - replaces the Google Fonts links in the root index with `experiments/lib/poppins.css`;
-- writes `robots.txt` with `Disallow: /`;
+- writes `robots.txt` at the repo root (allowing crawling — see the section above);
 - has a `--report` mode that audits every tracked page for data-entry elements, absolute
   brand URLs, external assets, `canonical`, `og:*`, JSON-LD, `<form>`, Qualified/Bing
   leftovers and a missing `noindex`.
@@ -660,3 +664,48 @@ current warning, then move the hosting before publishing experiment 6.
    trip. **Say that the three sampled URLs no longer resolve**, that the site was restructured
    on 2026-09-03, and give the live equivalent under `experiments/` — a reviewer who fetches
    three 404s learns nothing and has no reason to lift anything.
+
+## Appendix — the text submitted to Search Console (2026-09-09, second request)
+
+Kept verbatim so the next episode can see what was claimed. Everything in it was true at the
+time of sending and was verified in a browser on the published URLs first. If any of it stops
+being true — a form comes back, a page fetches something cross-origin — it becomes a liability
+exactly like the README did.
+
+> This site hosts unofficial front-end design prototypes made by our design studio. The pages
+> are locally saved copies of a public marketing page, kept only as a static backdrop so
+> animation experiments can be judged in context. They are not an official site of the brand
+> shown and are neither published nor endorsed by them.
+>
+> First, the three URLs in the report no longer exist and return 404:
+> /celonisvibecoding/datacore, /celonisvibecoding/datacore/ and
+> /celonisvibecoding/datacore/index3d.html. The site was restructured on 3 September 2026 and
+> every experiment moved under /experiments/. The live equivalent of the sampled page is
+> https://igorustarroz-bit.github.io/celonisvibecoding/experiments/datacore/index3d.html and
+> the index of all of them is https://igorustarroz-bit.github.io/celonisvibecoding/
+>
+> On review we found three real problems and have fixed all of them.
+>
+> 1. Those pages loaded icons and a font directly from the original brand's domain. Every
+> request any page makes is now same-origin. Nothing is loaded from that domain, from a CDN
+> or from a font service.
+>
+> 2. The pages contained input fields laid out as registration and newsletter forms. They had
+> no form element, no action and no name attributes, and nothing could be submitted, but that
+> is not the point: the pages looked like a brand asking for personal details. There is now no
+> form, input, select or textarea element anywhere on the site. The forms are static,
+> non-interactive replicas kept only so the page composition can be judged. Nothing can be
+> typed, sent or stored, and no data of any kind is collected.
+>
+> 3. Every file still carried the "saved from url" comment a browser writes when saving a
+> page. Removed.
+>
+> In addition: every outbound link is disabled, all analytics and tracking scripts and pixels
+> were removed, and no login, sign-up, download or payment flow exists, works or is linked
+> anywhere on the site. Every page is served with
+> <meta name="robots" content="noindex,nofollow"> and the index carries a visible notice that
+> these are unofficial design prototypes and not the brand's site. robots.txt allows crawling
+> deliberately, so that the noindex tag can actually be read.
+>
+> Please check the pages under /experiments/. We are happy to make further changes if anything
+> still looks wrong.

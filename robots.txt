@@ -1,3 +1,10 @@
-# Unofficial design prototypes. Nothing here should be indexed.
+# Unofficial design prototypes by a design studio. Not an official site of the
+# brand shown, and not published or endorsed by them.
+#
+# Crawling is deliberately allowed. Every page carries
+# <meta name="robots" content="noindex,nofollow">, and a crawler has to fetch
+# a page to read that tag: blocking here would hide the noindex rather than
+# enforce it, and would leave the URLs eligible for a bare listing. It would
+# also make it harder for a reviewer to confirm the state of the site.
 User-agent: *
-Disallow: /
+Allow: /

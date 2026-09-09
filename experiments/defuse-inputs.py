@@ -27,7 +27,9 @@ What this script does
    own domain any more. Every request becomes same-origin.
 3. Drops the fonts.googleapis.com link from the root index and points it at the
    local Poppins in experiments/lib/.
-4. Writes robots.txt (Disallow: /) at the repo root.
+4. Writes robots.txt at the repo root. It ALLOWS crawling on purpose: the
+   noindex meta tag on every page is what keeps the site out of the index,
+   and a crawler has to fetch the page to read it.
 5. Corrects the README claims that were false ("forms have been removed" when
    they had been replaced by typable replicas).
 
@@ -310,8 +312,22 @@ def audit(root, files):
 
 # --------------------------------------------------------------------------
 
-ROBOTS = ("# Unofficial design prototypes. Nothing here should be indexed.\n"
-          "User-agent: *\nDisallow: /\n")
+# robots.txt: crawling is ALLOWED on purpose. Every page carries
+# <meta name="robots" content="noindex,nofollow">, and a crawler must fetch the
+# page to read it — "Disallow: /" would hide the noindex instead of enforcing
+# it (the URLs stay eligible for a bare listing) and would make it harder for a
+# Safe Browsing reviewer to confirm the state of the site. Changed 2026-09-09,
+# after the second flag; the first version of this script wrote Disallow: /.
+ROBOTS = ('# Unofficial design prototypes by a design studio. Not an official site of the\n'
+         '# brand shown, and not published or endorsed by them.\n'
+         '#\n'
+         '# Crawling is deliberately allowed. Every page carries\n'
+         '# <meta name="robots" content="noindex,nofollow">, and a crawler has to fetch\n'
+         '# a page to read that tag: blocking here would hide the noindex rather than\n'
+         '# enforce it, and would leave the URLs eligible for a bare listing. It would\n'
+         '# also make it harder for a reviewer to confirm the state of the site.\n'
+         'User-agent: *\n'
+         'Allow: /\n')
 
 
 def main():
