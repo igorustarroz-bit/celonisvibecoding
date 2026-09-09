@@ -380,7 +380,73 @@ after the first warning was lifted (2026-09-03) and one day after experiment 5
 (`celosphere/`) was published. This is a **second offence on the same host**, which matters:
 a host with a repeat classification is slower and harder to clear than a first-timer.
 
-## Root cause: the inert forms were the wrong fix
+## What Search Console actually says — read this before believing the section below
+
+Search Console, "Problemas detectados / Páginas engañosas", gives three sample URLs:
+
+```
+https://igorustarroz-bit.github.io/celonisvibecoding/datacore
+https://igorustarroz-bit.github.io/celonisvibecoding/datacore/
+https://igorustarroz-bit.github.io/celonisvibecoding/datacore/index3d.html
+```
+
+Two things about that list matter more than anything else in this section.
+
+**1. All three URLs 404 today, and have done since 2026-09-03.** They are the *pre-restructure*
+paths: back then each experiment sat at the repo root, and everything moved under
+`experiments/` on 2026-09-03 (`dfda53f` → `f34615d`). Checked from a browser on the live host:
+
+| URL | status |
+|---|---|
+| `/celonisvibecoding/datacore` | 404 |
+| `/celonisvibecoding/datacore/` | 404 |
+| `/celonisvibecoding/datacore/index3d.html` | 404 |
+| `/celonisvibecoding/3d-book/index.html` (old path) | 404 |
+| `/celonisvibecoding/celonis-home/index.html` (old path) | 404 |
+| `/celonisvibecoding/experiments/datacore/index3d.html` (current) | 200 |
+
+So the classification is anchored on a crawl of pages **in their episode-1 state** — canonical
+and `og:*` pointing at the brand, JSON-LD declaring the brand identity, links to
+`id.celonis.cloud` and `signup.celonis.com`, Pardot forms, indexable. The pages that earned
+that verdict do not exist any more; they were never re-crawled at their new paths, they just
+went away.
+
+**2. Not one sample is a celosphere URL.** The story below — "experiment 5 shipped three
+registration forms and the flag came back" — was inferred from the timing, and the timing is
+the weakest evidence there is. What Google sampled is `datacore/`, which is exactly the pair of
+pages that carried the **211 live `<use href="https://www.celonis.com/…spritemap.svg#…">`
+hotlinks** (signal 2 below) and the inline `@font-face` fetching the brand's own woff2 — the
+only pages on the whole site still making requests to the impersonated domain. That is a much
+better fit for a page-level "deceptive" verdict than a newsletter field, and it is the signal
+this project had explicitly filed as "optional — not a phishing signal" five days earlier.
+
+**What this changes.** Nothing about the remediation: rules 12 and 13 stand on their own, and
+the work below is what makes the current pages defensible. What it changes is the review
+request and the next diagnosis. The review has to say plainly that the sampled URLs no longer
+resolve, that the site was restructured on 2026-09-03, and where the live equivalents are —
+otherwise a reviewer fetches three 404s and learns nothing. And the next time a flag arrives,
+**read the sample URLs first**: they say which pages Google looked at and, from their shape,
+roughly when. Both times the answer was already in Search Console before anyone started
+guessing.
+
+## An open contradiction: `robots.txt` vs `noindex`
+
+The remediation added `robots.txt` with `Disallow: /` while every page also carries
+`<meta name="robots" content="noindex,nofollow">`. Those two fight each other: Googlebot has to
+fetch a page to see its `noindex`, and `Disallow` stops it fetching. The documented outcome is
+a URL that stays eligible for a bare, description-less listing while the `noindex` is never
+read — the opposite of what was wanted. It may also slow a reviewer who is trying to confirm
+the fix; Safe Browsing's own scanners are not bound by `robots.txt`, but nothing is gained by
+making verification harder while a review is pending.
+
+`noindex` is the mechanism that actually works and it is on all 38 pages. The `Disallow: /` is
+the one to reconsider — not decided here, flagged for Igor.
+
+## Root cause: the inert forms were the wrong fix (whether or not they were this flag's trigger)
+
+Read the two sections above first: the flag's sample URLs point at `datacore/`, not at
+celosphere, so the account below is the reasoning that drove the remediation rather than a
+confirmed cause. It stands regardless — the forms had to go either way.
 
 The first cleanup removed the *identity* signals (canonical, `og:*`, JSON-LD, indexability,
 outbound links to the brand's login and signup) and the *functional* ones (real Pardot
@@ -468,6 +534,66 @@ The lesson is the one that keeps repeating in a new form: **the audit script rea
 the classifier renders the page.** Both checks are needed, and the browser one has to be run
 on the published URL, not on the source.
 
+## Two smaller things fixed in the same pass
+
+**The saved `fonts.css` was still asking the brand for its font.** Every experiment carries a
+one-line `original/fonts.css` (or `<Page name>_files/fonts.css`) whose `@font-face` pointed at
+`/src/assets/fonts/Poppins-Regular.woff2` — and `Concept-Video-Scroll` at `/fonts/…`. Those
+have always 404'd, because `lib/poppins.css` loads afterwards and wins, so nobody noticed. But
+they were a dead request on every page load, shaped exactly like the source site's asset tree,
+and the two `datacore/` pages carried the same URL in an inline `@font-face`. All of them now
+point at `../../lib/fonts/poppins-latin-400-normal.woff2`. Rule 13 means *no* request that
+names the source, including the ones that fail.
+
+**`defuse-inputs.py` can now clean a page before its first push.** It found files through
+`git ls-files`, which is right for a sweep of what is published but useless at the moment step
+3 of `claude_newexperiment_context.md` actually calls for it — a freshly saved experiment is
+not tracked yet. It now takes folders or files as positional arguments:
+
+```bash
+python3 experiments/defuse-inputs.py --report experiments/<name>   # audit first
+python3 experiments/defuse-inputs.py experiments/<name>            # then clean
+```
+
+In that mode it skips anything `.gitignore` covers (saved chat and marketing widget pages such
+as `original/3nkvm5.html` and `original/messenger.html` are full of fields, and are never
+served) and it does not touch `robots.txt`. Run over experiment 6 (`context-model/`, saved but
+not yet published): 2 data-entry elements per page — the footer newsletter field and the
+site's own region-search box — converted, audit clean.
+
+## Verified live, 2026-09-09
+
+All seven published pages — root index, `Concept-Video-Scroll/test1` and `test2`, `3d-globe`,
+`datacore/index3d`, `3d-book`, `celosphere` — opened on the published URL with a `?nocache=`
+query string:
+
+| check | result |
+|---|---|
+| `document.querySelectorAll('input,select,textarea,form').length` | **0** on all seven |
+| origins in `performance.getEntriesByType('resource')` | **same-origin only**, all seven |
+| `<meta name="robots">` | `noindex,nofollow` everywhere |
+| `<a href>` to celonis.com | none |
+| tuner panel in the DOM on a plain load | none; `?tuner` builds it, 59 sliders, as before |
+| remaining 404s | same-origin and intentional: `/dist/assets/spritemap.svg` (placeholder icons, `lib/sprite.js`) and two unreferenced saved assets |
+| forms | render as before — fields, chevrons, checkbox, "Register now"; the button shows the disabled note and does nothing |
+| 390 px, celosphere + 3d-book | `scrollWidth === innerWidth` |
+
+Local serving could not be used for this: the device shell runs in an isolated VM the browser
+pane cannot route to. Static checks stood in for it (audit, `<div>`/`<span>` balance across all
+38 pages, no experiment JS referencing the removed fields) and the real verification happened
+on the published URL — which is where it belongs anyway, and is the only reason the tuner
+panels were found.
+
+## An engineering trap worth remembering
+
+The `?tuner` gate shipped broken and the browser caught it. Writing the patch through a
+`python3 - <<'EOF'` heredoc in the device shell lost one level of backslash escaping: the
+`\b` in `/[?&]tuner\b/` arrived in the file as a literal `0x08` control character. `node
+--check` accepts it, it is invisible in terminal output, and the regex simply never matches —
+so `?tuner` did nothing while the `T` key still worked. Plain `cat > file <<'EOF'` was fine
+(`defuse-inputs.py` came through intact). After writing code that way, grep the result for
+control characters, or keep escapes out of the transported text.
+
 ## New mandatory rules
 
 **Rule 12 — no data-entry elements on a client replica.** A page that reproduces a client's
@@ -485,6 +611,11 @@ not just the new one.
 
 ## Lessons
 
+- **Read the sample URLs in Search Console before forming a theory.** Both times the answer
+  was sitting there. This time the samples were three `datacore/` paths that have 404'd since
+  the 2026-09-03 restructure — no celosphere URL anywhere — while the working assumption was
+  that experiment 5 had triggered it. Timing is the weakest evidence available; the sample
+  list is the strongest.
 - Each cleanup so far fixed the signals we had just learnt about and declared the rest safe.
   Three times now — the meta descriptions (2026-09-03), the "layout code" that was the TikTok
   pixel (2026-09-04), the inert forms (today) — the residue was something previously
@@ -526,4 +657,6 @@ current warning, then move the hosting before publishing experiment 6.
 7. Only then request the review in Search Console (Security Issues → Request Review), and
    say plainly what the site is, what was found and what was changed. A second request on the
    same host gets read by a human more carefully than the first; a vague one wastes the round
-   trip.
+   trip. **Say that the three sampled URLs no longer resolve**, that the site was restructured
+   on 2026-09-03, and give the live equivalent under `experiments/` — a reviewer who fetches
+   three 404s learns nothing and has no reason to lift anything.

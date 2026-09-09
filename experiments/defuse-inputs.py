@@ -65,6 +65,48 @@ def tracked_html(root):
     return [f for f in out.split('\0') if f]
 
 
+def listed_html(root, paths):
+    """The HTML under the paths given on the command line.
+
+    Step 3 of claude_newexperiment_context.md says to clean a saved page BEFORE
+    its first push, and at that moment git does not know the files yet, so the
+    tracked-file sweep above cannot see them. Pass the experiment folder (or
+    single files) and they are treated exactly the same way.
+    """
+    out = []
+    for given in paths:
+        full = given if os.path.isabs(given) else os.path.join(root, given)
+        full = os.path.abspath(full)
+        if os.path.isdir(full):
+            for base, dirs, names in os.walk(full):
+                dirs[:] = [d for d in dirs if d != '.git']
+                for name in sorted(names):
+                    if name.lower().endswith('.html'):
+                        out.append(os.path.relpath(
+                            os.path.join(base, name), root))
+        elif os.path.isfile(full) and full.lower().endswith('.html'):
+            out.append(os.path.relpath(full, root))
+        else:
+            sys.exit('not an HTML file or folder: %s' % given)
+
+    # Files git ignores are never served, so they are not part of what a
+    # classifier can see. They are also where the saved third-party widget
+    # pages live (chat, marketing iframes), which are full of fields we do
+    # not want to touch or count. Drop them, exactly as the tracked sweep
+    # does by construction.
+    if out:
+        proc = subprocess.run(['git', 'check-ignore', '--stdin'],
+                              cwd=root, input=chr(10).join(out),
+                              capture_output=True, text=True)
+        ignored = set(x for x in proc.stdout.splitlines() if x)
+        kept = [f for f in out if f not in ignored]
+        if len(kept) != len(out):
+            print('  (skipping %d gitignored file(s): never published)'
+                  % (len(out) - len(kept)))
+        out = kept
+    return out
+
+
 def attrs_of(tag):
     """Parse the attributes of a single start tag into a dict."""
     d = {}
@@ -274,6 +316,11 @@ ROBOTS = ("# Unofficial design prototypes. Nothing here should be indexed.\n"
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument('paths', nargs='*',
+                    help='folders or HTML files to clean; default: every '
+                         'HTML file git tracks. Use this to clean a saved '
+                         'page BEFORE its first push, while git still does '
+                         'not know it.')
     ap.add_argument('--root', default='.')
     ap.add_argument('--dry-run', action='store_true')
     ap.add_argument('--report', action='store_true',
@@ -284,7 +331,8 @@ def main():
     if not os.path.isdir(os.path.join(root, '.git')):
         sys.exit('not a git repo: %s' % root)
 
-    files = tracked_html(root)
+    files = (listed_html(root, args.paths) if args.paths
+             else tracked_html(root))
 
     if args.report:
         print('AUDIT — %d tracked HTML files\n' % len(files))
@@ -309,7 +357,7 @@ def main():
             if not args.dry_run:
                 open(p, 'w', encoding='utf-8').write(text)
 
-    if not args.dry_run:
+    if not args.dry_run and not args.paths:
         rp = os.path.join(root, 'robots.txt')
         if not os.path.exists(rp) or open(rp).read() != ROBOTS:
             open(rp, 'w').write(ROBOTS)
@@ -319,7 +367,8 @@ def main():
           % (total_fields, total_urls))
 
     print('\nAFTER\n')
-    files = tracked_html(root)
+    files = (listed_html(root, args.paths) if args.paths
+             else tracked_html(root))
     audit(root, files)
 
     print("""
