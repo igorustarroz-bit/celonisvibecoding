@@ -136,6 +136,15 @@
     boxRatioNarrow: 0.5,                // …and under 700 px: 1:2, a tall phone block
     viewWMin: 2.4,                      // smallest visible width, in world units
     lensMinPx: 400,                     // the lens is never narrower than this on screen
+    // the arrival: how much bigger it starts, how far below, and over how much of the
+    // arrival it shrinks into place (1 = the whole of it)
+    entryZoom: 5.7, entryRise: 6, entryLen: 0.55,
+    // the lens profile, so the crease can be tested from the panel. These four
+    // reproduce today's geometry exactly.
+    lensChamfer: 0, lensCrease: 1, lensSegments: 180, lensRings: 26,
+    // the exit: when the turn back to the circle starts and how long it takes. The
+    // departure begins exactly where those two end — it is not a third number.
+    exitTurnFrom: 0.30, exitTurnLen: 0.35, exitLift: 2.2, exitFadeFrom: 0.6,
     scrollPreview: 0, scrollScrub: 1,   // preview: 0 → 1 arrival, 1 → 2 exit (ignores the page scroll)
     flowUp: 1, timeScale: 1,
     // bloom + sharpness
@@ -347,17 +356,34 @@
   // the averaged normals keep the rim crisp.
   function lensProfile() {
     const h = Math.min(CFG.lensH, CFG.discH * CFG.holderH), R = DISC_R, b = CFG.bulge;  // never taller than the frame
-    const pts = [new THREE.Vector2(0.0001, h / 2), new THREE.Vector2(R, h / 2),
-                 new THREE.Vector2(R, h / 2), new THREE.Vector2(R, -h / 2),
-                 new THREE.Vector2(R, -h / 2)];
-    const N = 26;
+    const crease = CFG.lensCrease >= 0.5;          // duplicated point = hard edge
+    const c = Math.max(0, Math.min(CFG.lensChamfer, R * 0.5, h * 0.49));
+    const pts = [new THREE.Vector2(0.0001, h / 2)];
+    if (c > 0) {
+      // quarter-round bevel from the top face into the rim wall, so the normals turn
+      // over a few degrees instead of all at once
+      pts.push(new THREE.Vector2(R - c, h / 2));
+      const M = 6;
+      for (let i = 1; i <= M; i++) {
+        const a = (i / M) * Math.PI * 0.5;
+        pts.push(new THREE.Vector2(R - c + c * Math.sin(a), h / 2 - c * (1 - Math.cos(a))));
+      }
+    } else {
+      pts.push(new THREE.Vector2(R, h / 2));
+      if (crease) pts.push(new THREE.Vector2(R, h / 2));
+    }
+    pts.push(new THREE.Vector2(R, -h / 2));
+    if (crease) pts.push(new THREE.Vector2(R, -h / 2));
+    const N = Math.max(4, Math.round(CFG.lensRings));
     for (let i = 1; i <= N; i++) {
       const rr = R * (1 - i / N);
       pts.push(new THREE.Vector2(Math.max(0.0001, rr), -h / 2 - b * (1 - (rr / R) * (rr / R))));
     }
     return pts;
   }
-  function lensGeometry() { return new THREE.LatheGeometry(lensProfile(), 180); }
+  function lensGeometry() {
+    return new THREE.LatheGeometry(lensProfile(), Math.max(24, Math.round(CFG.lensSegments)));
+  }
   function lensBottomY(r) { return -Math.min(CFG.lensH, CFG.discH * CFG.holderH) / 2 - CFG.bulge * (1 - (r / DISC_R) * (r / DISC_R)); }
 
   const glass = new THREE.Mesh(
@@ -1484,7 +1510,8 @@
 
   // ---------------------------------------------------------------- scroll stages
   const stage = { rain: 1, order: 1, chaos: 0, lensScale: 1, lensLift: 0, chip: 1, flame: 1, trace: 1,
-                  camLift: 0, fade: 1, pose: 1, fireThrough: 0, appear: 1 };
+                  camLift: 0, fade: 1, pose: 1, fireThrough: 0, appear: 1,
+                  entryScale: 1, entryLift: 0 };
   // pose: 0 = circle facing the camera, flames behind; 1 = resting position
   const _qFace = new THREE.Quaternion(), _qSpin = new THREE.Quaternion(), _qPose = new THREE.Quaternion();
   const _dir = new THREE.Vector3(), _right = new THREE.Vector3(), _upC = new THREE.Vector3(), _tmp = new THREE.Vector3();
@@ -1576,6 +1603,11 @@
     let chip = ss(0.62, 0.82, tin);
     let trace = ss(0.8, 1.0, tin);
     let camLift = 0, fade = 1, lensLift = 0;
+    // the same ease-out as the turn, so the size, the height and the spin all brake
+    // into their final position together instead of finishing at three different times
+    const entry = easeOut(tin / Math.max(0.05, CFG.entryLen));
+    const entryScale = 1 + (CFG.entryZoom - 1) * (1 - entry);
+    const entryLift = -CFG.entryRise * (1 - entry);
     // exit: the dots go, then the traces, the lens turns back into the circle with the
     // flames behind it, and everything rises out of the frame
     if (tout > 0) {
@@ -1584,14 +1616,18 @@
       chip *= 1 - ss(0.05, 0.3, tout);
       trace *= 1 - ss(0.2, 0.5, tout);
       // …and on the way back to the circle
-      pose *= 1 - easeOut((tout - 0.4) / 0.45);
-      camLift = -2.2 * ss(0.55, 1.0, tout);           // the camera looks lower → the scene rises out of the frame
-      fade = 1 - ss(0.85, 1.0, tout);
+      pose *= 1 - easeOut((tout - CFG.exitTurnFrom) / Math.max(0.05, CFG.exitTurnLen));
+      // the first moment the disc is a full circle again — and only from there does it
+      // begin to leave: the camera looks lower, so the scene rises out of the frame
+      const circleAt = Math.min(0.9, CFG.exitTurnFrom + CFG.exitTurnLen);
+      camLift = -CFG.exitLift * ss(circleAt, 1.0, tout);
+      fade = 1 - ss(circleAt + (1 - circleAt) * CFG.exitFadeFrom, 1.0, tout);
     }
     stage.rain = rain; stage.order = order; stage.chaos = (1 - order) * 1.2;
     stage.lensScale = lensScale; stage.lensLift = lensLift; stage.chip = chip;
     stage.flame = flame; stage.trace = trace; stage.camLift = camLift; stage.fade = fade;
     stage.pose = pose; stage.appear = appear;
+    stage.entryScale = entryScale; stage.entryLift = entryLift;
     stage.fireThrough = (1 - pose) * 0.9 * appear;    // the flames show through the circle
   }
   function applyStage() {
@@ -1599,6 +1635,14 @@
     lensGroup.scale.setScalar(stage.lensScale);
     lensGroup.position.y = stage.lensLift;
     poseLens(stage.pose);
+    // the arrival, applied to the lens and the flame cluster together so they travel
+    // as one object — poseLens has just written fireGroup's scale and position
+    if (stage.entryScale !== 1 || stage.entryLift !== 0) {
+      lensGroup.scale.multiplyScalar(stage.entryScale);
+      lensGroup.position.y += stage.entryLift;
+      fireGroup.scale.multiplyScalar(stage.entryScale);
+      fireGroup.position.y += stage.entryLift;
+    }
     glassUniforms.uFireThrough.value = stage.fireThrough;
     partUniforms.uY0.value = lensBottomY(DISC_R) - 0.012 + stage.lensLift;
     partUniforms.uOpacity.value = CFG.partOpacity * stage.rain;

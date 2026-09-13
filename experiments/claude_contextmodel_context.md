@@ -131,6 +131,11 @@ A sticky child inside a clipping container has nowhere to stick, so `context.css
 | `viewWMin` | 2.4 | smallest visible width in world units (see below) |
 | `lensMinPx` | 400 | the lens is never narrower than this on screen (0 = off) |
 | `scrollPreview` / `scrollScrub` | 0 / 1 | ignore the page scroll and drive `T` by hand |
+| `entryZoom` / `entryRise` / `entryLen` | 5.7 / 6 / 0.55 | the arrival: how many times bigger it starts, how far below, over how much of the arrival it settles |
+| `exitTurnFrom` / `exitTurnLen` | 0.30 / 0.35 | the exit: when the turn back to the circle starts and how long it takes |
+| `exitLift` / `exitFadeFrom` | 2.2 / 0.6 | how far it rises out of frame, and when the fade starts in what is left |
+| `lensChamfer` / `lensCrease` | 0 / 1 | the lens profile's top corner: bevel size, and whether the duplicated point keeps the hard edge |
+| `lensSegments` / `lensRings` | 180 / 26 | lathe tessellation |
 
 ### The phone format, 2026-09-13
 
@@ -217,6 +222,51 @@ dpr, buffer, trace and particle counts, draw calls, fps). `CONTEXT_SCROLL(t)` dr
 declares which one it needs as the 6th item of its SPEC entry; the tuner passes it through as
 the `extra` tag and `onChange` calls it.
 
+## The arrival and the exit, 2026-09-13
+
+**The arrival** used to fade in, centred, at its final size. Now the lens and the flame
+cluster travel together: they start `entryZoom` times their size, `entryRise` world units
+below their place, and shrink and rise into it over `entryLen` of the arrival. The ease is
+the same `easeOut` as the turn, so size, height and spin brake into the final position
+together instead of finishing at three different times. Applied in `applyStage()` **after**
+`poseLens()`, which is what writes `fireGroup`'s scale and position — multiply on top of it,
+never before.
+
+Igor tuned it over three passes: 3x, then 5, then 6 with a rise of 8, and finally 5.7 / 6.
+The rise and the zoom pull against each other, and it is worth knowing why: the visible half
+height is about 1.4 world units, so a rise of 8 puts the cluster more than four screens below
+the frame and the first quarter of the arrival is a black block. At 6 it clears that.
+
+**The exit** now begins only at the first moment the disc reads as a circle again. It used to
+start rising at `tout` 0.55, where the turn back is a third done and the disc is still an
+ellipse. The moment of the circle is DERIVED — `exitTurnFrom + exitTurnLen` — rather than
+written as a third number, so retiming the turn can never leave the departure starting before
+or after it. The turn itself moved earlier (0.40/0.45 -> 0.30/0.35) to leave the departure
+some room.
+
+## The hard cut across the lens — what it is NOT
+
+Igor spotted a straight cut across the glass during the transition (not at rest, where the
+frame is clean). It is a bug, not an intended effect, and it is **still open**. What is
+established, each by a render:
+
+- It comes from the flame light: `auroraInt = 0` removes it completely.
+- It is not in the flame image: the raw `tFire` sample through the glass is a soft rounded
+  blob with a curved lower edge.
+- It is introduced inside the glass fragment shader: forcing `col` to a flat colour makes the
+  hard boundary disappear.
+- It tracks the lens geometry — doubling `discH` moves it.
+
+**Ruled out, so do not spend time on these again:** the aurora's `uFloorY` floor mask
+(released entirely, cut stays); total internal reflection (`ior` 1.01, where it cannot occur,
+cut stays); the underside `wash`; the `sheen`; `underEnv`; and — the most promising and still
+wrong — the **profile crease**. The two corners of `lensProfile()` are duplicated points,
+which is the LatheGeometry idiom for a hard edge, and a normal discontinuity feeding the
+refraction vector fitted every symptom. It does not survive the test: with `lensChamfer` at
+0.06 the cut is still there, only softer at one end, and with `lensCrease` at 0 it is
+unchanged. `lensChamfer`, `lensCrease`, `lensSegments` and `lensRings` were added to the panel
+for exactly this test and are left there; all four default to today's geometry.
+
 ## Two things that cost time on 2026-09-13
 
 **The `?v=` was not bumped after the second round of edits**, so Chrome on the Mac kept
@@ -252,6 +302,8 @@ icons, rewritten by `lib/sprite.js`) and the assets not copied into the test tre
 
 ## Open
 
+- **The hard cut across the lens during the transition** (see above). Still unexplained after
+  six ruled-out hypotheses; the profile knobs are in the panel for whoever picks it up.
 - **The hosting decision is still open** (`claude_antiphishing_context.md` §7): these are
   full-page replicas of a live commercial site on a heavily crawled host, and every fix so far
   has only made that input slightly less suspicious. Moving to Cloudflare Pages behind Basic
