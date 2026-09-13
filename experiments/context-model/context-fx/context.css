@@ -1,0 +1,44 @@
+/* =========================================================================
+   Context Model — the block that replaces the page's hero video (experiment 6).
+
+   The saved page puts the video in `.video-wrap-autoplay`, a content-width box
+   inside `.default-content-wrapper`. The canvas takes that box over — 16:9 as
+   the video was on desktop, 1:2 under 700 px so the animation has room to read
+   on a phone — and a taller scroll container around it gives the effect the
+   room it needs to be scrubbed as the block crosses the viewport.
+
+   Heights are written by context-core.js (layoutScroll), not here: the sticky
+   box must never be taller than what is left of the viewport under the header,
+   and the header is measured, never hard-coded.
+   ========================================================================= */
+
+/* The saved page sets `overflow: clip` on this wrapper. A sticky child inside a
+   clipping container has nowhere to stick, so the effect's box opts out — the
+   same reason lib/page-shell.css uses `overflow-x: clip` and never `hidden`. */
+.video-wrap-autoplay.context-model-fx { overflow: visible; }
+
+#context-scroll {
+  position: relative;
+  width: 100%;
+  height: 100vh;          /* placeholder until layoutScroll() measures the box */
+}
+
+#context-sticky {
+  position: sticky;
+  top: 0;                 /* the measured header height, written by JS */
+  width: 100%;
+  height: 56.25vw;        /* placeholder only: layoutScroll() writes the real height */
+  overflow: hidden;
+  border-radius: var(--fnd-radius-m, 4px);
+  background: #000;
+  /* The page fades its sections in; this one is painted by WebGL and has no
+     alpha of its own, so the arrival fade is applied to the canvas. */
+}
+
+#context-stage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+  opacity: 0;             /* raised by the effect as the arrival starts */
+}
