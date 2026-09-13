@@ -8,7 +8,7 @@ WebGL animations, scroll-driven video scrubbing, and similar ideas.
 nor endorsed by them.**
 
 The HTML pages under `experiments/` (`3d-globe/`, `datacore/`, `Concept-Video-Scroll/`,
-`3d-book/`, `celosphere/`) are locally saved copies of public web pages, kept only as a
+`3d-book/`, `celosphere/`, `context-model/`) are locally saved copies of public web pages, kept only as a
 static visual backdrop so the animation prototypes can be judged in context. They are
 **not** functional websites:
 
@@ -19,6 +19,10 @@ static visual backdrop so the animation prototypes can be judged in context. The
 - the newsletter, lead-capture and event-registration forms have been removed and replaced
   by **non-interactive visual replicas**: the pages contain no `<form>`, and no `<input>`,
   `<select>` or `<textarea>` element of any kind, so there is nowhere to type;
+- four of the prototypes show a tuning panel in the bottom-right corner, collapsed, for
+  adjusting the animation live. Its sliders, choices and colour pickers are built from
+  `<div>` elements, not form controls, so the guarantee above still holds exactly as
+  written; press `T` to hide it;
 - no login, sign-up, registration or payment flow exists, works or is linked;
 - no data of any kind is collected, transmitted or stored;
 - every page is served with `<meta name="robots" content="noindex,nofollow">`, so nothing
@@ -36,11 +40,12 @@ Index of experiments: [`index.html`](./index.html)
 - root: `index.html` (experiment index), `README.md`, `robots.txt`, `hanzo_logo.svg`, the
   Search Console verification file, `.nojekyll`.
 - `experiments/<name>/` — one folder per experiment (`3d-globe/`, `datacore/`,
-  `Concept-Video-Scroll/`, `3d-book/`, `celosphere/`). `3d-globe/` was named
-  `celonis-home/` until 2026-09-03.
+  `Concept-Video-Scroll/`, `3d-book/`, `celosphere/`, `context-model/`). `3d-globe/` was
+  named `celonis-home/` until 2026-09-03.
 - `experiments/` also holds what is shared: `nav-fx.js` (the common nav effect),
   `lib/` (three.js r147 + post-processing, GSAP 3.5.1 + ScrollTrigger, the placeholder
-  spritemap, Poppins and IBM Plex Mono, the inert form replicas, the gyroscope parallax
+  spritemap, Poppins and IBM Plex Mono, the inert form replicas, the shared tuning panel,
+  the gyroscope parallax
   for phones, the `page-shell.css` wrapper every experiment page uses to keep phones from
   zooming), `clean-saved-page.py` (the anti-impersonation cleanup as a script),
   `defuse-inputs.py` (removes every data-entry element and every absolute brand URL from
