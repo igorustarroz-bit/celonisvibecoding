@@ -709,3 +709,75 @@ exactly like the README did.
 >
 > Please check the pages under /experiments/. We are happy to make further changes if anything
 > still looks wrong.
+
+---
+
+# §8 — The handles come back, 2026-09-13
+
+## What changed and why
+
+The 2026-09-09 fix put all three tuner panels behind a `?tuner` gate, because they were built
+from `<input type="range">` and `<input type="color">` and rule 12 says a client replica
+contains no data-entry element. That closed the audit finding, but it broke a standing rule
+of this project that matters more than it looks: **the finished version of an experiment
+always ships its handles, and always shows what the antialiasing is really doing.** Igor,
+2026-09-13: the panels are compulsory, so find a way to make them compatible with the
+anti-phishing rules rather than hiding them.
+
+The way is simple once stated plainly. Rule 12 names four tags. A slider does not have to be
+one of them:
+
+> A slider, a colour picker and a dropdown are *affordances*, not tags. Rebuilt from `<div>`s
+> they behave identically and the page contains zero `<input>`, `<select>`, `<textarea>` or
+> `<form>` — so the panels can be on screen permanently and the audit still returns 0.
+
+`experiments/lib/tuner-ui.js` + `tuner-ui.css` is that rebuild, shared by every experiment.
+Its own doc is `experiments/claude_tunerui_context.md`. The four panels — Data Core, 3D book,
+celosphere seal, and the new Context Model — are now built on load again, collapsed, with `×`
+and the `T` key to hide them. `?tuner` still works and is now a no-op convenience.
+
+## What this does NOT change
+
+Rule 12 stands exactly as written. The point is not that it was too strict; it is that it was
+being read as "no controls" when it says "no data-entry elements". Nothing here licenses a
+real `<input>` anywhere on a replica, for any reason, and the kit asserts this on itself:
+`mount()` warns to the console if a single form element ever ends up inside a panel, and
+`TunerUI.audit()` returns the count for the whole document — which must be 0 on every page.
+
+Two things are genuinely different from the pre-09-09 panels and both are deliberate:
+
+- **The settings dump is a `<pre>`, not a `<textarea>`.** The old "Copy settings" fallback
+  created a hidden `<textarea>` to run `document.execCommand('copy')` on. The kit selects the
+  `<pre>`'s contents instead and copies the selection, so the fallback path — the normal one
+  from `file://`, where the async clipboard API has no secure context — never puts a form
+  element in the DOM, not even for a frame.
+- **No `INPUT|TEXTAREA|SELECT` guard on the `T` key.** The old handler skipped the hotkey when
+  the focus was in a field. There are no fields left on these pages, so the guard was checking
+  for something that cannot happen.
+
+## Verification for this change
+
+Static, on the repo: `defuse-inputs.py --report` → *clean, 38 tracked HTML files*.
+
+In a browser, which is the check that has caught every previous miss, on the Context Model
+page at 1440 and at 390 px with the panel built and visible:
+
+- `document.querySelectorAll('input,select,textarea,form').length` → **0**, before and after
+  clicking "Copy settings".
+- `performance` resources → **100 % same-origin**, zero cross-origin requests.
+- `document.documentElement.scrollWidth === innerWidth` at every point of the scroll-driven
+  sequence, at both sizes.
+
+The other three panels were built in a browser against their real settings objects (the
+literal lifted out of `datacore-3d.js`, `book-3d.js` and `seal-knit.js` and handed to the
+tuner as its global): 29, 29 and 59 rows respectively, every path resolving to a real value,
+0 form elements in each, and 0 after "Copy settings".
+
+## Lesson
+
+Add this to the list in §7, because it is the same shape as the others in reverse. Every
+previous remediation removed something. This one is the first time the right answer was to
+**keep the capability and change the implementation** — and it was available on 2026-09-09,
+because rule 12 has always been about tags. A rule read as a ban on a whole class of tooling
+costs real work on every experiment afterwards. When a rule seems to forbid something the
+project needs, re-read what it actually says before paying for the workaround.

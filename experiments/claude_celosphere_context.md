@@ -410,3 +410,23 @@ this doc, `lib/plex-mono.css` + the woff2, `.gitignore`, index, README), push wi
    ("Experiment 5"), run both sweeps, `git add -A` (the lib font + css are untracked too),
    commit, push with the token, then check the published page's network panel (all
    same-origin) and `file://`.
+
+---
+
+## The tuner moved onto the shared kit, 2026-09-13
+
+`celosphere/celosphere-fx/seal-tuner.js` (?v=20) is now a knob list on top of `lib/tuner-ui.js`; it builds nothing itself. The
+panel is **built on load again, collapsed**, as it was before the 2026-09-09 `?tuner` gate:
+the kit's sliders, chips and colour swatches are `<div>`s, so the page still contains zero
+`<input>`, `<select>`, `<textarea>` or `<form>` and anti-phishing rule 12 holds. `×` and the
+`T` key hide and show it; `?tuner` still works and is now a no-op convenience.
+
+Two behaviours arrived with the move, on every panel in the repo: **double-click a row** to
+reset that one knob (the value is amber while it differs from the default), and **the variable
+each knob writes to is printed under its label**.
+
+All 58 knob paths were checked to resolve against window.SEAL, and the panel was built in a browser
+against the real settings object: every value real, 0 form elements, 0 after "Copy settings".
+
+Read `claude_tunerui_context.md` before changing anything in it, and
+`claude_antiphishing_context.md` §8 for why the gate is gone.

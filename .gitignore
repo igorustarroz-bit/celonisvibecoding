@@ -727,3 +727,6 @@ _to_delete/
 # python bytecode
 __pycache__/
 *.pyc
+
+# Cowork scratch folder that mounts inside the repo — never publish it
+Claude outputs/

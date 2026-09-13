@@ -98,10 +98,13 @@ order of risk:
    flagged a second time; the old "inert but typable" rule 9 is dead. Fields are
    `<div class="inert-field">` / `<span class="inert-check">` — run
    `python3 ../defuse-inputs.py` from the repo root and it converts them for you.
-   **This includes dev panels**: the tuner sliders are `<input type="range">`, so a
-   tuner must build on demand only (`?tuner` in the URL, or the `T` key), never on load.
-   If a prototype genuinely needs typing, build it on a page that does not carry the
-   client's identity.
+   **This includes dev panels** — but not by hiding them. Build the tuner on
+   `../lib/tuner-ui.js`, whose sliders, chips and colour swatches are `<div>`s, and it
+   can be visible on load like any other handle while the page still audits at zero
+   form elements. See `claude_tunerui_context.md`, and `claude_antiphishing_context.md`
+   §8 for why the 2026-09-09 `?tuner` gate is gone. Never hand-roll a panel out of
+   `<input type="range">` again. If a prototype genuinely needs typing, build it on a
+   page that does not carry the client's identity.
 6. Tracking files are NOT deleted from disk: `git rm --cached` + an explicit rule in
    `.gitignore` (the `.gitignore` paths carry the prefix
    `/experiments/<name>/...`; renaming or moving a folder means updating them).
@@ -318,7 +321,12 @@ to `experiments/`.
 - [ ] On the PUBLISHED url, in a real browser:
       `document.querySelectorAll('input,select,textarea,form').length === 0` (rule 12)
       and every `performance.getEntriesByType('resource')` entry same-origin (rule 13).
-- [ ] Any tuner / dev panel builds on demand only (`?tuner` or the `T` key), never on load.
+- [ ] The tuner is built on `../lib/tuner-ui.js` (no `<input>`/`<select>`/`<textarea>`
+      anywhere in it), is present on load, collapsed, and `T` hides and shows it.
+- [ ] Every knob prints the variable it writes to under its label, and a double-click
+      on a row resets that knob (amber value = changed). Igor's rule, 2026-09-13.
+- [ ] Every knob path resolves against the effect's real settings object — a mistyped
+      path shows `undefined` in the panel and writes a property nobody reads.
 - [ ] `<script src="../nav-fx.js?v=N">` on every page in the folder, with the `?v=`
       bumped if the JS was touched.
 - [ ] `<div class="page-shell">` around the whole body + `../lib/page-shell.css` (section 4b);
