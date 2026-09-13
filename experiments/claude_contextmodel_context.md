@@ -3,10 +3,17 @@
 Replaces the hero video of the client's `/platform/context-model` page with a WebGL study of
 the same animation. Saved page cleaned 2026-09-09; the effect ported in on 2026-09-13.
 
-**Not published yet, on purpose.** A second Safe Browsing review is open — see
-`claude_antiphishing_context.md` §7, "Open decision". Publishing a fresh replica of the
-client's site while a review is pending is the one thing guaranteed not to help. The folder is
-untracked and absent from the root `index.html`.
+**Published 2026-09-13** (commit `5cc2ced`), as experiment 6 in the root `index.html`.
+
+This overrode a standing recommendation, and the reasoning should stay on the record: a second
+Safe Browsing review is open (`claude_antiphishing_context.md` §7, "Open decision"), and the
+advice there was to hold a fresh replica back until the warning lifts. Igor decided to publish
+anyway, having been told twice. What makes it defensible rather than reckless is that this page
+is the first one built clean from the start — rules 12 and 13 were applied before its first
+push, not retrofitted: zero data-entry elements, zero cross-origin requests, `noindex`, no link
+to the brand's domain, and the saved page's 30-odd tracking files never entered git. If the
+warning does come back, this page is not the thing to look at first; the four older replicas
+are, and the hosting decision in §7 is still the real answer.
 
 ## What it draws
 
@@ -245,11 +252,24 @@ icons, rewritten by `lib/sprite.js`) and the assets not copied into the test tre
 
 ## Open
 
-- **Not published.** Add it to the root `index.html` and push only once the Safe Browsing
-  warning is lifted — or, better, once the hosting has moved behind auth
-  (`claude_antiphishing_context.md` §7, "Open decision").
+- **The hosting decision is still open** (`claude_antiphishing_context.md` §7): these are
+  full-page replicas of a live commercial site on a heavily crawled host, and every fix so far
+  has only made that input slightly less suspicious. Moving to Cloudflare Pages behind Basic
+  Auth on `labs.hanzo.es` remains the answer that removes the problem instead of reducing it.
+- **Submit the Safe Browsing review** — the text is written and kept in the appendix of §7.
 - **On desktop the composition still sits small in the 16:9 box**, with space left and right
   — it was framed on a portrait reference (1440 × 1602). The phone now fills its frame via
   `viewWMin`; the same lever would work on desktop by raising `viewWMin` past 5.06, but that
   crops the top and bottom of a 16:9 box, so reframing there means `viewH`, `camY` and
   `camEl`. A design decision for Igor, not a bug.
+
+## Publish log
+
+- **2026-09-13** — first push, commit `5cc2ced`. Verified on the published URL in a browser:
+  `input,select,textarea,form` -> 0, `performance` resources 100 % same-origin, `noindex`
+  present, no `<a>` to the brand's domain, no `<video>` left in the page, the tuner panel
+  present and collapsed with 139 rows. The only 404 is the intentional same-origin
+  `/dist/assets/spritemap.svg`, which `lib/sprite.js` rewrites.
+  Layout and pixels were verified in headless Chromium at nine window sizes before the push,
+  not on the live host: the built-in browser pane reports a 0 x 0 viewport and
+  `document.hidden = true`, so it is good for JS state and network and useless for geometry.

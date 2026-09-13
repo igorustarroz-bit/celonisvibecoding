@@ -781,3 +781,21 @@ previous remediation removed something. This one is the first time the right ans
 because rule 12 has always been about tags. A rule read as a ban on a whole class of tooling
 costs real work on every experiment afterwards. When a rule seems to forbid something the
 project needs, re-read what it actually says before paying for the workaround.
+
+## Publish log — 2026-09-13
+
+Experiment 6 (`context-model/`) was published (commit `5cc2ced`) while the second review is
+still open, against the recommendation in §7. Igor's call, made with the trade-off in front of
+him. Recorded here because the next diagnosis has to start from what is actually on the host:
+
+- It is the first replica built clean from the start — rules 12 and 13 applied before the
+  first push rather than retrofitted. Zero data-entry elements, zero cross-origin requests,
+  `noindex`, no link to the brand's domain, the saved page's ~30 tracking files never in git.
+- The four tuner panels are visible on load again (§8) and contain no form element. Verified on
+  all four published URLs after the push: `input,select,textarea,form` -> 0 and 100 %
+  same-origin on the root index, `context-model`, `celosphere`, `3d-book` and `datacore`.
+
+**If a third flag arrives, read the Search Console sample URLs before forming a theory** — both
+previous times the answer was already there, and both previous times the working assumption was
+wrong. The hosting decision in §7 remains the only fix that removes the input the classifier
+reacts to rather than reducing it.
