@@ -957,3 +957,66 @@ does allow cannot be pushed back.
 
 Leftovers Igor can remove from a normal terminal: `.git/index.lock.old*`,
 `.git/HEAD.lock.old*`, a few `.git/objects/*/tmp_obj_*`, and `_to_delete/`.
+
+---
+
+## 22. `view-transition-name` took the header's z-index (2026-09-14)
+
+**Igor, on a phone:** *"En móvil, en el menú se ha quedado transparente y parece
+que las cosas pasan por encima."*
+
+Exactly that: the fixed black header bar stayed in place but the page scrolled
+straight through it.
+
+### The cause
+
+`view-transition-name` is not a label. Per the spec, an element that carries one
+**forms a stacking context** (and a containing block for its fixed and absolutely
+positioned descendants). We put it on `.header-wrapper`.
+
+The saved header layers itself **from the inside**:
+
+```
+header.header-wrapper        position: static,   z-index: auto   ← we named this
+  div.header.block           position: relative, z-index: 9      ← the real lift
+    div.nav-wrapper          position: fixed,    z-index: 2
+```
+
+That `z-index: 9` is what puts the bar above the page. Naming the wrapper trapped
+it: 9 now ranks only *within the wrapper's own new context*, and the wrapper itself
+sits at the z-index 0 layer among its siblings. The whole header effectively
+dropped from 9 to 0 and lost to content further down the document.
+
+It showed on mobile first because that is where the bar is fixed over full-bleed
+content. Desktop had the same defect and nothing visible to reveal it.
+
+### The fix
+
+Move the layer the name took over — give the **wrapper** the z-index its child used
+to provide:
+
+```css
+html[data-sfx-page] .header-wrapper {
+  view-transition-name: sfx-nav;
+  position: relative;
+  z-index: 9;               /* what .header.block gave it before the name */
+}
+```
+
+Measured at 390 px, hit-testing the centre of the bar at several scroll positions:
+before, the top element was a link from the page body; after, it is the `nav`, at
+every position, and the header renders identically to `original.html`. Desktop
+unchanged, transition still 6/6. Verified live at 375 px on both pages, at four
+scroll depths.
+
+### The rule
+
+**The element you give a `view-transition-name` inherits responsibility for its
+subtree's stacking — so give it the highest z-index it used to contain.** Check
+this on any saved page that layers a header, a sticky bar or an overlay from a
+child rather than from the element you are naming, and check it at phone width,
+where a fixed bar over full-bleed content is the thing that makes it visible.
+
+A second consequence of the same spec line, not hit here but worth knowing: the
+named element also becomes the containing block for `position: fixed` descendants.
+A fixed child of a short, static wrapper can stop being viewport-fixed.
