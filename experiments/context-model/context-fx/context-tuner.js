@@ -167,6 +167,7 @@
         ["exitTurnLen", "Exit: how long the turn back takes", 0.1, 0.7, 0.05],
         ["exitLift", "Exit: how far it rises out of frame", 0, 5, 0.1],
         ["exitFadeFrom", "Exit: when the fade starts, of what is left", 0, 1, 0.05],
+        ["exitClear", "Exit: when dots, chips and traces have gone", 0.1, 1, 0.05],
         ["scrollOut", "Exit length (box heights)", 0.2, 4, 0.1],
         ["scrollLead", "Lead-in before the box sticks", 0, 1, 0.05],
         ["scrollLeadCap", "Most of the timeline the lead-in may take", 0.1, 0.8, 0.05],

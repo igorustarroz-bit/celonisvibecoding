@@ -123,7 +123,7 @@ A sticky child inside a clipping container has nowhere to stick, so `context.css
 
 | knob | default | what it is |
 |---|---|---|
-| `scrollIn` / `scrollHold` / `scrollOut` | 1.2 / 1.0 / 1.2 | timeline, in box heights |
+| `scrollIn` / `scrollHold` / `scrollOut` | 2.4 / 1.0 / 2.4 | timeline, in box heights |
 | `scrollLead` | 0.25 | extra lead-in beyond the box's own approach |
 | `scrollLeadCap` | 0.35 | most of the timeline the lead may take |
 | `boxRatio` | 1.778 | the box's proportion — 16:9, what the video was |
@@ -133,7 +133,8 @@ A sticky child inside a clipping container has nowhere to stick, so `context.css
 | `scrollPreview` / `scrollScrub` | 0 / 1 | ignore the page scroll and drive `T` by hand |
 | `entryZoom` / `entryRise` / `entryLen` | 5.7 / 6 / 0.55 | the arrival: how many times bigger it starts, how far below, over how much of the arrival it settles |
 | `exitTurnFrom` / `exitTurnLen` | 0.30 / 0.35 | the exit: when the turn back to the circle starts and how long it takes |
-| `exitLift` / `exitFadeFrom` | 2.2 / 0.6 | how far it rises out of frame, and when the fade starts in what is left |
+| `exitLift` / `exitFadeFrom` | 2.2 / 0 | how far it rises out of frame, and when the fade starts in what is left (0 = with the rise) |
+| `exitClear` | 0.3 | when the dots, the chips and the traces have all gone |
 | `lensChamfer` / `lensCrease` | 0 / 1 | the lens profile's top corner: bevel size, and whether the duplicated point keeps the hard edge |
 | `lensSegments` / `lensRings` | 180 / 26 | lathe tessellation |
 
@@ -237,12 +238,34 @@ The rise and the zoom pull against each other, and it is worth knowing why: the 
 height is about 1.4 world units, so a rise of 8 puts the cluster more than four screens below
 the frame and the first quarter of the arrival is a black block. At 6 it clears that.
 
+**Half speed, 2026-09-14.** `scrollIn` and `scrollOut` doubled, 1.2 -> 2.4 box heights each.
+There is no other way to slow a scroll-scrubbed effect: half the speed is twice the scrolling.
+The cost is page length, and it is not small — the block goes from 3036 px to 4829 px on a
+1440 x 900 desktop and from 2826 px to 4506 px on a 390 px phone, about 60 % more of the
+article's scroll spent on one block. `scrollHold` was left at 1.0: it is a pause, not an
+animation playing.
+
 **The exit** now begins only at the first moment the disc reads as a circle again. It used to
 start rising at `tout` 0.55, where the turn back is a third done and the disc is still an
 ellipse. The moment of the circle is DERIVED — `exitTurnFrom + exitTurnLen` — rather than
 written as a third number, so retiming the turn can never leave the departure starting before
 or after it. The turn itself moved earlier (0.40/0.45 -> 0.30/0.35) to leave the departure
 some room.
+
+Two more exit corrections, 2026-09-14:
+
+- **The traces clear with the dots.** They used to fade over `tout` 0.2 -> 0.5 while the dots
+  below went over 0.0 -> 0.3, so the lines hung in the air after the data under them had gone.
+  Everything the lens was working on — dots, the chips on its underside, the traces above —
+  now shares one window, `exitClear`, held in a single local so the three cannot drift apart
+  again.
+- **It hides as it rises, not after.** `exitFadeFrom` is 0: the fade starts at the same moment
+  as the lift, which is the moment of the circle. It used to wait until 60 % of what was left
+  of the exit, so the lens rose for a long time before beginning to disappear.
+
+Measured across the exit after both: dots and traces identical at every sample (0.50 at
+T 1.15, 0 at 1.30), pose 0 at T 1.65 with the lift still 0 — the circle and the departure
+meeting exactly — then lift -0.44 / opacity 0.80 at 1.75 and -2.08 / 0.06 at 1.95.
 
 ## The hard cut across the lens — what it is NOT
 

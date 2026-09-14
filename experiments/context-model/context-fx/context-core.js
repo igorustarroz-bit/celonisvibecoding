@@ -130,7 +130,7 @@
     // Lengths are in box heights, not viewport heights: the effect is scrubbed by its
     // own block crossing the viewport. scrollLead starts the arrival before the box
     // has finished travelling up.
-    scrollIn: 1.2, scrollHold: 1.0, scrollOut: 1.2, scrollLead: 0.25,
+    scrollIn: 2.4, scrollHold: 1.0, scrollOut: 2.4, scrollLead: 0.25,
     scrollLeadCap: 0.35,                // most of the timeline the lead-in may use
     boxRatio: 1.778,                    // the box the video had: 16:9
     boxRatioNarrow: 0.5,                // …and under 700 px: 1:2, a tall phone block
@@ -144,7 +144,8 @@
     lensChamfer: 0, lensCrease: 1, lensSegments: 180, lensRings: 26,
     // the exit: when the turn back to the circle starts and how long it takes. The
     // departure begins exactly where those two end — it is not a third number.
-    exitTurnFrom: 0.30, exitTurnLen: 0.35, exitLift: 2.2, exitFadeFrom: 0.6,
+    exitTurnFrom: 0.30, exitTurnLen: 0.35, exitLift: 2.2, exitFadeFrom: 0,
+    exitClear: 0.3,                     // dots, chips and traces all gone by here
     scrollPreview: 0, scrollScrub: 1,   // preview: 0 → 1 arrival, 1 → 2 exit (ignores the page scroll)
     flowUp: 1, timeScale: 1,
     // bloom + sharpness
@@ -1611,10 +1612,13 @@
     // exit: the dots go, then the traces, the lens turns back into the circle with the
     // flames behind it, and everything rises out of the frame
     if (tout > 0) {
-      rain *= 1 - ss(0.0, 0.3, tout);
-      order *= 1 - ss(0.0, 0.3, tout);
-      chip *= 1 - ss(0.05, 0.3, tout);
-      trace *= 1 - ss(0.2, 0.5, tout);
+      // one window for everything the lens was working on: the dots below, the chips
+      // on its underside and the traces above all go together
+      const cleared = ss(0.0, CFG.exitClear, tout);
+      rain *= 1 - cleared;
+      order *= 1 - cleared;
+      chip *= 1 - ss(0.05, CFG.exitClear, tout);
+      trace *= 1 - cleared;
       // …and on the way back to the circle
       pose *= 1 - easeOut((tout - CFG.exitTurnFrom) / Math.max(0.05, CFG.exitTurnLen));
       // the first moment the disc is a full circle again — and only from there does it
