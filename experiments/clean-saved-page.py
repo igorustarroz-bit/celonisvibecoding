@@ -39,6 +39,16 @@ def remove_div(h, marker):
             return h
         h = h[:i] + h[pos:]
 
+def strip_head_divs(h):
+    """Remove <div> elements a widget left inside <head> (see the call site)."""
+    i = h.lower().find('</head>')
+    if i < 0:
+        return h
+    head, rest = h[:i], h[i:]
+    head = re.sub(r'<div\b[^>]*>\s*</div>\s*', '', head, flags=re.I)
+    return head + rest
+
+
 def clean(html, old_assets, new_assets, title):
     h = html
     # assets folder rename
@@ -63,6 +73,13 @@ def clean(html, old_assets, new_assets, title):
     h = re.sub(r'<style\b[^>]*>(?:(?!</style>).)*?url\([\'"]?(?:https?:)?//(?:(?!</style>).)*?</style>\s*', '', h, flags=re.S | re.I)
     # third-party widget DOM left in the page: the OneTrust cookie banner
     h = remove_div(h, 'id="onetrust-consent-sdk"')
+    # ...and the 1x1 measuring divs some widgets leave INSIDE <head>. A <div>
+    # there is invalid, so the parser closes the head at that point and starts
+    # the body: everything appended before </head> afterwards (a stylesheet, a
+    # <link rel="expect">) silently becomes a body element. Found 2026-09-14,
+    # when it was half the reason the view transitions of experiment 7 only
+    # fired sometimes. Only <div> is stripped, and only inside the head.
+    h = strip_head_divs(h)
     # <picture><source srcset="https://cdn..."> -> keep only the local <img>
     h = re.sub(r'<source\b[^>]*srcset="(?:https?:)?//[^"]*"[^>]*>\s*', '', h, flags=re.I)
     h = re.sub(r'\s(?:srcset|data-src)="(?:https?:)?//[^"]*"', '', h, flags=re.I)

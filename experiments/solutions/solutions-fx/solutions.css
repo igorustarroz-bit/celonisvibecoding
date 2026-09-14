@@ -1,0 +1,280 @@
+/* =========================================================================
+   Solutions — experiment 7 stylesheet.
+
+   Unofficial design prototype. Not an official page of the brand shown, and
+   not published or endorsed by them.
+
+   Three things live here:
+     1. the cross-document @view-transition between the two pages,
+     2. the target cursor (the corner brackets that snap to the buttons),
+     3. the per-character wrappers the text effects need, and the slot the
+        WebGL hero canvas sits in.
+
+   Every rule is scoped to this experiment: either to one of our own classes
+   (.sfx-*) or to `html[data-sfx-page]`, which only these two pages carry.
+   ========================================================================= */
+
+/* -------------------------------------------------------------------------
+   1. View transitions — cross-document, home <-> supply chain
+   -------------------------------------------------------------------------
+   Both pages opt in, so Chrome keeps a snapshot of the outgoing page and
+   animates it into the incoming one. Same-origin only, and only over http(s):
+   opened from file:// every document is its own opaque origin, so the
+   navigation is a plain load and everything below is simply ignored.
+
+   The choreography Igor asked for, 2026-09-14 — "un fade y luego de size con
+   los heros" — is two beats, deliberately not simultaneous:
+
+     beat 1, 0-220 ms   everything EXCEPT the clicked card and the header fades
+                        out. The page empties around the thing you clicked.
+     beat 2, 100-740 ms the card's box grows and travels into the hero of the
+                        page it opened, while the new page fades up underneath
+                        it. The size change is the event; the fade is what
+                        clears the stage for it.
+
+   The header is named too, so it is lifted out of the root snapshot and holds
+   still through both beats instead of fading with everything else — that is
+   what makes the rest read as one object moving rather than a slide change.
+
+   The three timings are custom properties so the tuner can drive them. The
+   INCOMING document's values are the ones the browser uses, so the panel
+   mirrors them into sessionStorage and view-transitions.js reapplies them on
+   the other page (see that file).
+   ------------------------------------------------------------------------- */
+@view-transition { navigation: auto; }
+
+:root {
+  --sfx-vt-out: 220ms;      /* the outgoing page clears */
+  --sfx-vt-in: 420ms;       /* the incoming page fades up */
+  --sfx-vt-title: 520ms;    /* the title travels between the two positions */
+  --sfx-vt-lift: 8px;       /* how far the incoming page drifts up under it */
+}
+
+/* -------------------------------------------------------------------------
+   The choreography: THE TITLE IS THE ONLY THING THAT TRAVELS.
+
+   The first build morphed the clicked card's whole box into the detail page's
+   hero block. Two boxes of very different proportions tweening into one
+   another is a lot of motion carrying very little meaning, and it fought the
+   hero video for attention the moment it landed.
+
+   This version names one pair instead: the words "Supply Chain" as the card's
+   <h3> on the grid, and the same words as the hero's overtitle on the detail
+   page. Identical text, so the morph is legible rather than merely animated —
+   the reader watches the thing they clicked become the thing they arrived at,
+   and everything else crosses underneath. Landing hands off to the decrypt,
+   which is armed on S.vtReady and starts on that very element.
+
+   Both pages name the same thing, so going back reverses without a second
+   rule: the overtitle travels down into the grid. Igor, 2026-09-14.
+   ------------------------------------------------------------------------- */
+
+::view-transition-old(root) {
+  animation: sfx-fade-out var(--sfx-vt-out) cubic-bezier(.4, 0, 1, 1) both;
+}
+::view-transition-new(root) {
+  animation: sfx-fade-in var(--sfx-vt-in) cubic-bezier(0, 0, .2, 1) 140ms both,
+             sfx-lift var(--sfx-vt-in) cubic-bezier(0, 0, .2, 1) 140ms both;
+}
+@keyframes sfx-fade-out { to { opacity: 0; } }
+@keyframes sfx-fade-in { from { opacity: 0; } }
+/* A short drift, so the page reads as settling under the title rather than
+   simply appearing. Small on purpose: the whole page is moving. */
+@keyframes sfx-lift { from { transform: translateY(var(--sfx-vt-lift)); } }
+
+/* The header is the same object on both pages: named, so it stays put. */
+html[data-sfx-page] .header-wrapper { view-transition-name: sfx-nav; }
+
+/* The travelling title. view-transitions.js puts `.sfx-vt-title` on the card
+   heading rather than the CSS naming it directly, because the heading carries
+   no class of its own in the saved markup — only an id we must not rely on
+   staying put. */
+html[data-sfx-page="home"] .sfx-vt-title { view-transition-name: sfx-title; }
+html[data-sfx-page="supply-chain"] .detail-page-hero .overtitle {
+  view-transition-name: sfx-title;
+}
+
+::view-transition-group(sfx-title) {
+  animation-duration: var(--sfx-vt-title);
+  animation-timing-function: cubic-bezier(.22, 1, .36, 1);
+  z-index: 3;               /* above both page snapshots for the whole trip */
+}
+/* The two snapshots are the same words at different sizes. `contain` keeps
+   each one's proportions while the group's box interpolates, so the type
+   scales instead of stretching; anchoring left-centre keeps the first letter
+   on the same line through the whole move, which is what makes the eye follow
+   it rather than re-find it at the end. */
+::view-transition-old(sfx-title),
+::view-transition-new(sfx-title) {
+  height: 100%;
+  width: 100%;
+  object-fit: contain;
+  object-position: left center;
+  mix-blend-mode: normal;
+}
+/* Both snapshots are the SAME WORDS, so there is nothing to cross-fade
+   between: the incoming one simply stays opaque underneath for the whole trip
+   and the outgoing one dissolves off it. Fading both — the first attempt —
+   put each at ~18 % around the midpoint and the title vanished for a few
+   frames in the middle of its own journey. */
+::view-transition-new(sfx-title) { animation: none; opacity: 1; }
+::view-transition-old(sfx-title) {
+  animation: sfx-fade-out calc(var(--sfx-vt-title) * 0.5) ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root),
+  ::view-transition-old(sfx-title),
+  ::view-transition-new(sfx-title) { animation: none; }
+  ::view-transition-group(sfx-title) { animation-duration: 1ms; }
+}
+
+/* -------------------------------------------------------------------------
+   2. Target cursor
+   -------------------------------------------------------------------------
+   Four corner brackets and a dot, spinning slowly, that snap around whatever
+   carries .cursor-target (target-cursor.js puts that class on the buttons).
+   mix-blend-mode: difference keeps it readable on both the black hero and the
+   white sections without a second colour.
+   ------------------------------------------------------------------------- */
+.sfx-cursor {
+  position: fixed;
+  top: 0; left: 0;
+  width: 0; height: 0;
+  pointer-events: none;
+  z-index: 9998;
+  mix-blend-mode: difference;
+  will-change: transform;
+}
+/* The four brackets turn as ONE rigid body. Rotating each bracket's offset
+   instead makes them orbit while staying upright, which reads as a pinwheel,
+   not a reticle. Keeping the spin here rather than in JS also leaves it on the
+   compositor, so it costs nothing to let it run. */
+.sfx-cursor__spin {
+  position: absolute;
+  left: 0; top: 0;
+  width: 0; height: 0;
+  animation: sfx-cursor-spin var(--sfx-spin, 2s) linear infinite;
+}
+.sfx-cursor--nospin .sfx-cursor__spin,
+.sfx-cursor--locked .sfx-cursor__spin { animation: none; transform: none; }
+@keyframes sfx-cursor-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .sfx-cursor__spin { animation: none; }
+}
+.sfx-cursor__dot {
+  position: absolute;
+  left: 0; top: 0;
+  width: 4px; height: 4px;
+  margin: -2px 0 0 -2px;
+  background: #fff;
+  border-radius: 50%;
+  will-change: transform;
+}
+.sfx-cursor__corner {
+  position: absolute;
+  left: 0; top: 0;
+  width: var(--sfx-corner, 12px);
+  height: var(--sfx-corner, 12px);
+  border: var(--sfx-border, 3px) solid #fff;
+  will-change: transform;
+}
+.sfx-cursor__corner--tl { border-right: none; border-bottom: none; }
+.sfx-cursor__corner--tr { border-left: none;  border-bottom: none; }
+.sfx-cursor__corner--br { border-left: none;  border-top: none; }
+.sfx-cursor__corner--bl { border-right: none; border-top: none; }
+
+/* Only hide the system cursor once ours is actually running. */
+html.sfx-cursor-on, html.sfx-cursor-on * { cursor: none !important; }
+
+/* -------------------------------------------------------------------------
+   3. Text effects
+   ------------------------------------------------------------------------- */
+/* One span per character, wrapped word by word. The real glyph never leaves
+   the flow — it only turns invisible — so the character keeps its exact
+   width, and the noise character is drawn over it, centred and out of flow.
+   Without that, every substitution changes a width and a three-line heading
+   re-wraps on every frame. The word wrapper is what stops a line breaking
+   between two inline-block characters ("Ma / ke Enterprise AI"); the spaces
+   between words stay as plain text nodes, so the page wraps as it always did. */
+.sfx-word { white-space: nowrap; }
+.sfx-char { position: relative; display: inline-block; }
+.sfx-char > i { font-style: inherit; font-weight: inherit; }
+.sfx-sub {
+  position: absolute;
+  left: 50%; top: 0;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+/* No custom property set = the noise takes the colour of the text it is
+   standing in: grey in the grey overtitle, white in the white heading. The
+   tuner sets the property only when a single colour is forced. */
+.sfx-encrypted > .sfx-sub { color: var(--sfx-encrypted-color, inherit); }
+
+/* Count-up numbers keep their own width so the layout does not step as the
+   digits change. */
+.sfx-count { font-variant-numeric: tabular-nums; }
+
+/* -------------------------------------------------------------------------
+   4. The WebGL hero
+   -------------------------------------------------------------------------
+   The canvas takes the place of the hero's decorative <svg>. The svg stays in
+   the DOM — it is the fallback when there is no WebGL — and is only hidden
+   once fluid-glass.js reports that it is drawing.
+   ------------------------------------------------------------------------- */
+.sfx-glass-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+}
+/* The lens draws into a canvas laid over its source, so the source's own box
+   has to be a positioning context. */
+.sfx-glass-host { position: relative; }
+
+/* source: circles — the decorative svg steps aside for the canvas copy */
+.sfx-glass-on .secondary-hero-background { opacity: 0; }
+
+/* source: video — THE <video> IS NEVER HIDDEN. The canvas sits over it, in the
+   same box, drawing the same frame opaquely, so hiding the element underneath
+   buys nothing; and every way the canvas can fail — a texture the driver
+   refuses, a context that never comes back, a frame that never decodes — used
+   to leave a black rectangle where the video had been. Igor, 2026-09-14:
+   "comprobado que con off vuelve a verse". Leaving the video in place means
+   the worst case is a transparent canvas over a video that plays normally. */
+
+/* -------------------------------------------------------------------------
+   5. Splash cursor (home hero)
+   -------------------------------------------------------------------------
+   Sits in the hero's own box, behind the headline: `.secondary-hero` carries
+   `z-index: 1`, so a canvas in the decorative slot paints under the type and
+   over the circles. `--full` puts it back across the viewport, the way
+   react-bits ships it.
+   ------------------------------------------------------------------------- */
+.sfx-splash-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+}
+.sfx-splash-canvas--full {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 9997;
+}
+
+/* The hero text is drawn inside the canvas so the lens can refract it, so the
+   DOM copy has to stop painting. `color: transparent` rather than
+   `visibility: hidden`, for three reasons: the text stays selectable, it stays
+   in the accessibility tree, and the standfirst's `::before` white square is a
+   background colour — hiding the element would take the square with it, and
+   the square is part of the design. */
+.sfx-glass-text { color: transparent !important; }
+.sfx-gl-word { display: inline; }

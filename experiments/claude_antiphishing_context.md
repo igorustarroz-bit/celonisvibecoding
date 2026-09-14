@@ -799,3 +799,49 @@ him. Recorded here because the next diagnosis has to start from what is actually
 previous times the answer was already there, and both previous times the working assumption was
 wrong. The hosting decision in §7 remains the only fix that removes the input the classifier
 reacts to rather than reducing it.
+
+---
+
+# Log — 2026-09-14, widget leftovers INSIDE `<head>`
+
+Not a phishing signal, but a cleanup miss with real consequences, found while building
+experiment 7 (`solutions/`).
+
+Every saved Celonis page carries two of these **inside `<head>`**:
+
+```html
+<div style="width: 1px; height: 1px; display: inline; position: absolute;"></div>
+```
+
+A `<div>` in `<head>` is invalid HTML. The parser closes the head at that point and starts
+the body, so **everything we append before `</head>` afterwards ends up in the `<body>`** —
+our stylesheet, and in experiment 7 a `<link rel="expect">` that consequently did nothing.
+A body stylesheet still applies, which is why this went unnoticed on five experiments; what
+it cannot do is act as an early opt-in, and it was half the reason that experiment's
+cross-document view transitions only fired about half the time.
+
+`clean-saved-page.py` now strips empty `<div>`s from the head (`strip_head_divs`). For the
+already-cleaned experiments, the check is one line:
+
+```bash
+python3 - <<'PY'
+import io, re, subprocess
+for f in [f for f in subprocess.check_output(['git','ls-files']).decode().split('\n') if f.endswith('.html')]:
+    h = io.open(f, encoding='utf-8', errors='surrogateescape').read()
+    n = len(re.findall(r'<div', h[:h.lower().find('</head>')]))
+    if n: print(n, f)
+PY
+```
+
+Fixed in `solutions/` (4 pages) on 2026-09-14. **The older experiments have not been
+checked** — do it in the same pass as the next sweep.
+
+Two related notes from the same day:
+
+- **The `@view-transition` opt-in has to be inline and first in `<head>`.** In an external
+  stylesheet — ours was the last of twenty — Chrome often reads it after it has already
+  decided the incoming document gets no transition.
+- **`device_commit_files` reported `written` and left the previous revision on disk again**
+  (the 2026-09-13 note in `claude/safe-browsing-cleanup.md`). A second identical call with
+  `force: true` wrote the right file. Verify every commit by line count or checksum, never
+  by the tool's success message.
