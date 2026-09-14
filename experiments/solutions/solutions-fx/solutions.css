@@ -82,8 +82,27 @@
    simply appearing. Small on purpose: the whole page is moving. */
 @keyframes sfx-lift { from { transform: translateY(var(--sfx-vt-lift)); } }
 
-/* The header is the same object on both pages: named, so it stays put. */
-html[data-sfx-page] .header-wrapper { view-transition-name: sfx-nav; }
+/* The header is the same object on both pages: named, so it stays put.
+
+   `view-transition-name` is not a label — it makes the element form a STACKING
+   CONTEXT (and a containing block for its fixed and absolutely positioned
+   descendants). The saved header layers itself from the inside: the wrapper is
+   `position: static` and the `.header.block` within it carries
+   `position: relative; z-index: 9`, which is what lifts the bar above the page.
+   Naming the wrapper traps that 9 inside the wrapper's own new context, so the
+   whole header dropped to the z-index 0 layer and the page scrolled straight
+   over it — on mobile, where the bar is fixed and the content is full-bleed,
+   that read as the menu having gone transparent. Igor, 2026-09-14.
+
+   The fix is to move the layer the name took over: give the WRAPPER the
+   z-index its child used to provide. Rule of thumb for every future
+   view-transition-name: the element you name inherits responsibility for its
+   subtree's stacking, so give it the highest z-index it used to contain. */
+html[data-sfx-page] .header-wrapper {
+  view-transition-name: sfx-nav;
+  position: relative;
+  z-index: 9;               /* what .header.block gave it before the name */
+}
 
 /* The travelling title. view-transitions.js puts `.sfx-vt-title` on the card
    heading rather than the CSS naming it directly, because the heading carries
