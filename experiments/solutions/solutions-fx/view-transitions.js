@@ -149,8 +149,15 @@
              !box.querySelector('a[href*="supply-chain/index.html"]')) {
         box = box.parentElement; hops++;
       }
+      /* The size guard exists to catch a walk that ran past the card and
+         swallowed half the page. It must not depend on the viewport being
+         sane: a headless or hidden context reports innerHeight 0, the guard
+         becomes "height < 0", and the transition silently switches itself off
+         — which is exactly how it presented when the published page was
+         checked from a 0 x 0 browser pane. Floor it. */
+      var cap = Math.max(window.innerHeight || 0, 600) * 1.2;
       var ok = head && box && box !== document.body &&
-               box.getBoundingClientRect().height < window.innerHeight * 1.2;
+               box.getBoundingClientRect().height < cap;
       if (ok) {
         head.classList.add('sfx-vt-title');
         state.marked = 1;
