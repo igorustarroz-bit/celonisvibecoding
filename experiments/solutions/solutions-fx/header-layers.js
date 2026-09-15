@@ -29,6 +29,7 @@
 
   var SEL = '.nav-wrapper';
   var last = -1;
+  var wayBack = false;
 
   function measure() {
     var bar = document.querySelector(SEL);
@@ -55,9 +56,41 @@
       'data-sfx-nav', bar && bar.classList.contains('nav-hidden') ? 'hidden' : 'shown');
   }
 
+  /* The way back. The header's "Solutions" is a <button> that opens a mega-menu
+     the saved page can no longer open — the site's own JS is stripped on every
+     experiment in this repo — so on the detail page it is the obvious way back
+     to the section home and it does nothing at all.
+
+     Give it the navigation and leave the element exactly as saved. Converting
+     it to an <a> would hand it anchor styling instead of the nav's own, and
+     would drop it out of the target cursor, which frames it as a `button`.
+     A scripted navigation still runs the cross-document view transition —
+     measured 3/3, the same as a real click — so the way back looks like the way
+     in. Igor, 2026-09-15. */
+  function backLink() {
+    if (document.documentElement.getAttribute('data-sfx-page') !== 'supply-chain') return;
+    var btn = document.querySelector(SEL + ' li.nav-drop button[aria-controls="solutions"]');
+    if (!btn) return;
+
+    /* It no longer opens anything, and saying otherwise to a screen reader is
+       worse than saying nothing. */
+    btn.removeAttribute('aria-haspopup');
+    btn.removeAttribute('aria-expanded');
+    btn.removeAttribute('aria-controls');
+    btn.setAttribute('title', 'Solutions');
+    btn.style.cursor = 'pointer';
+
+    btn.addEventListener('click', function (e) {
+      e.preventDefault();
+      location.href = '../home/index.html';
+    });
+    wayBack = true;
+  }
+
   function start() {
     measure();
     mirror();
+    backLink();
 
     var bar0 = document.querySelector(SEL);
     if (bar0 && window.MutationObserver) {
@@ -81,6 +114,7 @@
     return {
       navHeight: last,
       navState: document.documentElement.getAttribute('data-sfx-nav'),
+      wayBackWired: wayBack,
       published: document.documentElement.style.getPropertyValue('--sfx-nav-h') || null,
       navZ: bar ? getComputedStyle(bar).zIndex : null,
       headerZ: (function () {

@@ -1216,3 +1216,49 @@ it the first time: the 60 darkest pixels of the tile now average **exactly
 stroke, and a computed value that looks right is not evidence that the pixels are.
 
 Files: `solutions-fx/solutions.css`; cache bust `?v=18`.
+
+---
+
+## 26. The way back (2026-09-15)
+
+**Igor:** *"Haz que el enlace en el header en supply chain de solutions te lleve a
+la home."*
+
+The header's "Solutions" is a `<button aria-haspopup>` that opens a mega-menu the
+saved page can no longer open — the site's own JS is stripped on every experiment
+in this repo. On the detail page it is the obvious way back to the section home,
+and it did nothing at all. There *is* an anchor to our copy inside that menu
+(`title="All transformations"`, already rewritten by the cleanup), but it is
+unreachable because the menu never opens.
+
+### Keep the element, give it the navigation
+
+```js
+btn.addEventListener('click', function (e) { e.preventDefault(); location.href = '../home/index.html'; });
+```
+
+**Not converted to an `<a>`**, which was the first instinct. The saved page styles
+that item as a nav button; an anchor would take anchor styling instead, and it
+would fall out of the target cursor, which frames it through the bare `button`
+selector (§ the cursor's selector list is scoped to `.page-shell`). The `<button>`
+is also perfectly rule-12 clean — the rule names `form`, `input`, `select` and
+`textarea`, not buttons.
+
+The three `aria-*` attributes are removed, though: it no longer opens anything,
+and telling a screen reader it has a popup is worse than telling it nothing.
+
+### The measurement that decided the approach
+
+The worry was that a scripted navigation would skip the cross-document view
+transition, which would have forced the anchor conversion. It does not:
+
+| how the navigation is started | transition |
+|---|---|
+| `location.href = …` | **3/3** |
+| synthetic `<a>` click | **3/3** |
+| the real button, clicked | **5/5** |
+
+So the way back looks exactly like the way in — the hero texts and the title
+travel in reverse, because both pages name the same things.
+
+Files: `solutions-fx/header-layers.js`; cache bust `?v=19`.
