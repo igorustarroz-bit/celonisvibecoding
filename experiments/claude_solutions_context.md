@@ -1020,3 +1020,92 @@ where a fixed bar over full-bleed content is the thing that makes it visible.
 A second consequence of the same spec line, not hit here but worth knowing: the
 named element also becomes the containing block for `position: fixed` descendants.
 A fixed child of a short, static wrapper can stop being viewport-fixed.
+
+---
+
+## 23. The heroes travel too, and the desktop header (2026-09-15)
+
+### 23.1 Three pairs cross instead of one
+
+**Igor:** the home headline *"Celonis Solutions"* should move to where *"Transform
+your supply chain operations with Celonis"* is, and its standfirst to where the
+supply-chain standfirst is — and the same in reverse.
+
+Two more names, on the two elements that hold the same ROLE on both pages:
+
+```css
+html[data-sfx-page="home"]         .secondary-hero .secondary-hero-title,
+html[data-sfx-page="supply-chain"] .detail-page-hero h1.title
+  { view-transition-name: sfx-hero-title; }
+
+html[data-sfx-page="home"]         .secondary-hero .secondary-hero-body-copy,
+html[data-sfx-page="supply-chain"] .detail-page-hero .detail-text-content
+  { view-transition-name: sfx-hero-copy; }
+```
+
+**These two are animated the opposite way to `sfx-title`.** That pair is the same
+words on both sides, so §19.3 holds the incoming snapshot opaque and dissolves the
+outgoing one off it. These are *different* sentences in the same role, so the
+cross-fade is the whole point: the old sentence dissolves as the new one arrives in
+its place. `object-position: left top` rather than `left center`, because a
+two-line headline becoming a four-line one should grow from the corner the two
+share.
+
+Worth knowing: **the home hero is far off-screen when the card is clicked** — the
+reader is a thousand pixels down the page — and Chrome captures and animates it
+anyway. The headline flies in from above the viewport. Verified 6/6 forward and on
+`back`, with all three groups named on both sides.
+
+New timing knob `vt.hero` (560 ms) beside `vt.title`, both in the tuner.
+
+### 23.2 The desktop header — a second, different fault in the same place
+
+**Igor:** *"El header en escritorio también se ve transparente y con cosas por
+encima cuando no debe."*
+
+Not the §22 bug again. The saved page parks its sticky section menu differently at
+each breakpoint:
+
+| | `top` | `z-index` | result |
+|---|---|---|---|
+| phones | 64px | 2 | below the header — correct |
+| desktop | **0** | **10** | exactly over the header, and outranking it |
+
+So on desktop the white `.anchor-secondary-menu-wrapper` covers the top 65 px of
+the 89 px black bar and leaves a 24 px strip with the page sliding past under it.
+Made desktop match the phone behaviour, which is plainly the intended one: the menu
+parks below the header, and the header outranks the menu (z-index 9 → 11) so the
+two can never trade places again.
+
+The offset is `var(--sfx-nav-h, 88px)`, published by the new
+`solutions-fx/header-layers.js` from the measured height of `.nav-wrapper` — 88 on
+desktop, 64 on phones, re-measured on resize, rotation and `document.fonts.ready`.
+The repo rule is to measure that bar rather than hard-code it, precisely because it
+changes at the breakpoint.
+
+### 23.3 How to test "is this bar actually covered" — three attempts, one answer
+
+The first two measurements both lied, in opposite directions.
+
+1. **`elementFromPoint` inside the bar.** Reported the header as covered at every
+   scroll position on desktop — because the saved CSS puts `pointer-events: none` on
+   `.nav-wrapper` there, so hit-testing passes straight through a bar that is
+   painting perfectly. **Hit-testing is not paint order.**
+2. **Screenshot the strip and look.** Showed the header as fine — because the frames
+   sampled happened to be ones where `nav-fx` had faded the bar out, or where the bar
+   and the page behind it were both black.
+
+What actually answers the question: **render the bar's own box twice, once with the
+bar visible and once with `visibility: hidden` on the bar alone, and diff.** The
+percentage of its box that changes is the percentage the bar really paints. Before
+the fix, home desktop: **0.0 %** — on our copy and on the untouched `original.html`
+alike. After: **99.4 %**.
+
+One caveat learnt immediately after: that diff reads near zero for a black bar over
+a black page, which is a false alarm, not a covered header. Where the page behind is
+the same colour, tint the bar instead (`background: magenta !important`) and measure
+how much of the box comes back magenta — 89 % on desktop and 95 % on phones, the
+remainder being the logo, the menu items and the green button.
+
+Files: `solutions-fx/solutions.css`, `view-transitions.js`, `solutions-tuner.js`,
+new `header-layers.js`; cache bust `?v=16`.

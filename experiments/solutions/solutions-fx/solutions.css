@@ -47,6 +47,7 @@
   --sfx-vt-out: 220ms;      /* the outgoing page clears */
   --sfx-vt-in: 420ms;       /* the incoming page fades up */
   --sfx-vt-title: 520ms;    /* the title travels between the two positions */
+  --sfx-vt-hero: 560ms;     /* the hero headline and standfirst travel too */
   --sfx-vt-lift: 8px;       /* how far the incoming page drifts up under it */
 }
 
@@ -101,7 +102,34 @@
 html[data-sfx-page] .header-wrapper {
   view-transition-name: sfx-nav;
   position: relative;
-  z-index: 9;               /* what .header.block gave it before the name */
+  z-index: 11;              /* see the note below — 9 was not enough on desktop */
+}
+
+/* -------------------------------------------------------------------------
+   The desktop header, part two (Igor, 2026-09-15: "el header en escritorio
+   también se ve transparente y con cosas por encima").
+
+   A different fault from the phone one, in the same place. The saved page
+   parks its sticky section menu differently at each breakpoint:
+
+     phones   .anchor-secondary-menu-wrapper  top: 64px  z-index: 2   → below
+     desktop  .anchor-secondary-menu-wrapper  top: 0     z-index: 10  → ON TOP
+
+   So on desktop the white menu sits exactly where the fixed black header is
+   and outranks it, covering its top 65 px and leaving a 24 px strip of header
+   with page content sliding past underneath — which reads as a header that has
+   gone transparent. Measured: the header bar painted 0.0 % of its own box in
+   that state, on our copy and on the untouched original alike.
+
+   The phone behaviour is plainly the intended one, so desktop is made to match
+   it: the menu parks BELOW the header, and the header outranks the menu so the
+   two can never trade places again. The offset is the measured height of
+   `.nav-wrapper` (88 px desktop, 64 px phones) published as `--sfx-nav-h` by
+   header-layers.js — the repo rule is to measure that bar, never to hard-code
+   it, because it changes at the breakpoint.
+   ------------------------------------------------------------------------- */
+html[data-sfx-page] .anchor-secondary-menu-wrapper {
+  top: var(--sfx-nav-h, 88px);
 }
 
 /* The travelling title. view-transitions.js puts `.sfx-vt-title` on the card
@@ -113,10 +141,54 @@ html[data-sfx-page="supply-chain"] .detail-page-hero .overtitle {
   view-transition-name: sfx-title;
 }
 
+/* The two heroes travel as well (Igor, 2026-09-15). Three pairs now cross
+   together: the card heading becomes the overtitle, and the hero's headline
+   and standfirst become the destination's. They are the same two roles on both
+   pages — the big statement and the sentence under it — so the eye keeps hold
+   of the layout while the words themselves change. Each lands on an element
+   that then decrypts or scrambles, which is armed on S.vtReady. */
+html[data-sfx-page="home"] .secondary-hero .secondary-hero-title,
+html[data-sfx-page="supply-chain"] .detail-page-hero h1.title {
+  view-transition-name: sfx-hero-title;
+}
+html[data-sfx-page="home"] .secondary-hero .secondary-hero-body-copy,
+html[data-sfx-page="supply-chain"] .detail-page-hero .detail-text-content {
+  view-transition-name: sfx-hero-copy;
+}
+
 ::view-transition-group(sfx-title) {
   animation-duration: var(--sfx-vt-title);
   animation-timing-function: cubic-bezier(.22, 1, .36, 1);
   z-index: 3;               /* above both page snapshots for the whole trip */
+}
+::view-transition-group(sfx-hero-title),
+::view-transition-group(sfx-hero-copy) {
+  animation-duration: var(--sfx-vt-hero);
+  animation-timing-function: cubic-bezier(.22, 1, .36, 1);
+  z-index: 2;
+}
+/* These two pairs are NOT the same words, so here the cross-fade is the point:
+   the old sentence dissolves as the new one arrives in its place. Anchored top
+   left and scaled to fit, so a two-line headline becoming a four-line one
+   grows from the corner it shares rather than from its middle. */
+::view-transition-old(sfx-hero-title),
+::view-transition-new(sfx-hero-title),
+::view-transition-old(sfx-hero-copy),
+::view-transition-new(sfx-hero-copy) {
+  height: 100%;
+  width: 100%;
+  object-fit: contain;
+  object-position: left top;
+  mix-blend-mode: normal;
+}
+::view-transition-old(sfx-hero-title),
+::view-transition-old(sfx-hero-copy) {
+  animation: sfx-fade-out calc(var(--sfx-vt-hero) * 0.45) ease-out both;
+}
+::view-transition-new(sfx-hero-title),
+::view-transition-new(sfx-hero-copy) {
+  animation: sfx-fade-in calc(var(--sfx-vt-hero) * 0.55)
+             ease-in calc(var(--sfx-vt-hero) * 0.35) both;
 }
 /* The two snapshots are the same words at different sizes. `contain` keeps
    each one's proportions while the group's box interpolates, so the type
@@ -145,8 +217,14 @@ html[data-sfx-page="supply-chain"] .detail-page-hero .overtitle {
   ::view-transition-old(root),
   ::view-transition-new(root),
   ::view-transition-old(sfx-title),
-  ::view-transition-new(sfx-title) { animation: none; }
-  ::view-transition-group(sfx-title) { animation-duration: 1ms; }
+  ::view-transition-new(sfx-title),
+  ::view-transition-old(sfx-hero-title),
+  ::view-transition-new(sfx-hero-title),
+  ::view-transition-old(sfx-hero-copy),
+  ::view-transition-new(sfx-hero-copy) { animation: none; }
+  ::view-transition-group(sfx-title),
+  ::view-transition-group(sfx-hero-title),
+  ::view-transition-group(sfx-hero-copy) { animation-duration: 1ms; }
 }
 
 /* -------------------------------------------------------------------------

@@ -116,6 +116,7 @@
       ['vt.fadeOut', 'Outgoing page clears (ms)', 0, 900, 10],
       ['vt.fadeIn', 'Incoming page fades up (ms)', 0, 1200, 10],
       ['vt.title', 'The title travels (ms)', 120, 1600, 10],
+      ['vt.hero', 'The hero texts travel (ms)', 120, 1600, 10],
       ['vt.lift', 'Incoming page drift (px)', 0, 48, 1]
     ]]);
 

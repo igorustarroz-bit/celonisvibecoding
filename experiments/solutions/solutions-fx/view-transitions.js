@@ -41,6 +41,7 @@
     fadeOut: 220,   // the outgoing page clears
     fadeIn: 420,    // the incoming page fades up
     title: 520,     // the title travels from the card to the hero overtitle
+    hero: 560,      // the hero headline and standfirst travel to their new places
     lift: 8         // px the incoming page drifts up under it
   };
 
@@ -60,7 +61,7 @@
       var raw = sessionStorage.getItem(KEY);
       if (!raw) return;
       var o = JSON.parse(raw);
-      ['fadeOut', 'fadeIn', 'title', 'lift'].forEach(function (k) {
+      ['fadeOut', 'fadeIn', 'title', 'hero', 'lift'].forEach(function (k) {
         if (typeof o[k] === 'number') VT[k] = o[k];
       });
     } catch (e) {}
@@ -71,6 +72,7 @@
     s.setProperty('--sfx-vt-out', VT.fadeOut + 'ms');
     s.setProperty('--sfx-vt-in', VT.fadeIn + 'ms');
     s.setProperty('--sfx-vt-title', VT.title + 'ms');
+    s.setProperty('--sfx-vt-hero', VT.hero + 'ms');
     s.setProperty('--sfx-vt-lift', VT.lift + 'px');
     save();
   };
