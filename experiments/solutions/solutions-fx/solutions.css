@@ -130,7 +130,65 @@ html[data-sfx-page] .header-wrapper {
    ------------------------------------------------------------------------- */
 html[data-sfx-page] .anchor-secondary-menu-wrapper {
   top: var(--sfx-nav-h, 88px);
+  transition: top .26s cubic-bezier(.4, 0, .2, 1);
 }
+
+/* …and the menu follows the header up and down, so the strip the header
+   occupies is NEVER an empty gap. Parking the menu below the bar fixed the
+   overlap but bought a new fault: nav-fx fades the bar out on the way down
+   (`nav-hidden` is opacity, not display), and the menu stayed where it was,
+   leaving 89 px of page scrolling past above a white bar floating on nothing.
+   Igor, 2026-09-15: "siempre que el header baje con el anchor-secondary-menu-
+   wrapper debe verse con el fondo negro."
+
+   So there are only two states, and the black bar is present in both of the
+   ones you can see: header down and menu under it, or no header and the menu
+   at the very top. header-layers.js mirrors nav-fx's own class onto <html> —
+   the menu is a cousin of the bar, not a descendant, so CSS cannot read that
+   state on its own. The transition above matches nav-fx's fade, so the two
+   move together rather than one chasing the other. */
+html[data-sfx-nav="hidden"] .anchor-secondary-menu-wrapper { top: 0; }
+
+/* The header's "Try for free" is not inside the bar nav-fx fades: the saved
+   page builds it as a separate `position: fixed` button, a SIBLING of
+   `.nav-wrapper` inside `.header.block`. It happened to be hidden before only
+   because the sticky menu outranked the whole header and covered it; once the
+   header was lifted above the menu it started floating on the page on its own,
+   a green button with no bar under it. It belongs to the header, so it leaves
+   and returns with the header. */
+html[data-sfx-page] .header-wrapper a.button.conversion {
+  transition: opacity .22s ease;
+}
+html[data-sfx-nav="hidden"] .header-wrapper a.button.conversion {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-sfx-page] .anchor-secondary-menu-wrapper { transition: none; }
+}
+
+/* -------------------------------------------------------------------------
+   The way in (Igor, 2026-09-15: "ponme el fondo de este botón flecha en verde
+   para destacarlo").
+
+   The Supply Chain card is the only door between the two pages — the nav
+   mega-menu does not open, because the site's own JS is stripped on every
+   experiment here — and it looked exactly like the two dead cards beside it.
+   The brand green is the same #5CFE50 the page already uses for "Try for
+   free" and that the splash cursor paints with, so the button reads as the
+   site's own primary action rather than as something we bolted on. Matched by
+   href, so the two cards that go nowhere keep their grey.
+   ------------------------------------------------------------------------- */
+html[data-sfx-page="home"] a.link-with-arrow[href$="supply-chain/index.html"] .icon-only {
+  background-color: #5cfe50;
+}
+html[data-sfx-page="home"] a.link-with-arrow[href$="supply-chain/index.html"]:hover .icon-only,
+html[data-sfx-page="home"] a.link-with-arrow[href$="supply-chain/index.html"]:focus-visible .icon-only {
+  background-color: #46e63a;
+}
+/* The arrow is already black and stays black: the saved page draws it with
+   `fill: #000`, which is the same pairing the green CTA uses for its label. */
 
 /* The travelling title. view-transitions.js puts `.sfx-vt-title` on the card
    heading rather than the CSS naming it directly, because the heading carries

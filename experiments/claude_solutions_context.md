@@ -1109,3 +1109,73 @@ remainder being the logo, the menu items and the green button.
 
 Files: `solutions-fx/solutions.css`, `view-transitions.js`, `solutions-tuner.js`,
 new `header-layers.js`; cache bust `?v=16`.
+
+---
+
+## 24. The way in, and the header's two loose ends (2026-09-15)
+
+### 24.1 The Supply Chain card's arrow goes green
+
+**Igor:** *"Ponme el fondo de este botón flecha en home hacia supply chain en
+verde para destacarlo."*
+
+That card is the only door between the two pages — the nav mega-menu does not
+open, because the site's own JS is stripped on every experiment here — and it
+looked exactly like the two dead cards beside it. `#5CFE50`, the same green the
+page already uses for "Try for free" and that the splash cursor paints with, so
+it reads as the site's own primary action rather than as something bolted on.
+The arrow stays black, which is the pairing that green CTA already uses.
+
+Matched by href, not by position:
+
+```css
+html[data-sfx-page="home"] a.link-with-arrow[href$="supply-chain/index.html"] .icon-only
+  { background-color: #5cfe50; }
+```
+
+**1 of the page's 134 arrow buttons** turns green; the two cards that go nowhere
+keep their grey, which is the point.
+
+### 24.2 The menu has to follow the header, not just sit under it
+
+**Igor:** *"Siempre que el header baje con el anchor-secondary-menu-wrapper debe
+verse con el fondo negro."*
+
+§23.2 parked the sticky menu below the bar and fixed the overlap — and bought a
+new fault with it. `nav-fx` hides the bar by fading it (`nav-hidden` is opacity,
+not display), so on the way down the bar vanished and the menu stayed put,
+leaving **89 px of page scrolling past above a white bar floating on nothing**.
+
+There are only two states worth having, and the black bar is present in both of
+the ones you can see:
+
+| state | bar | menu |
+|---|---|---|
+| header down | visible, black | parked at `--sfx-nav-h`, under it |
+| header away | faded out | at the very top, `top: 0` |
+
+The menu is a **cousin** of the bar, not a descendant, so no CSS selector can
+read `nav-hidden` from it. `header-layers.js` mirrors that class onto `<html>`
+as `data-sfx-nav`, a `MutationObserver` on the bar's `class` attribute, and the
+stylesheet keys off that. The `top` transition matches nav-fx's fade so the two
+move together rather than one chasing the other.
+
+### 24.3 A piece of the header that was not in the header
+
+Lifting the header above the sticky menu (§23.2) exposed something that had been
+hidden by accident: the header's floating **"Try for free"** is not inside the
+bar nav-fx fades. The saved page builds it as a separate `position: fixed`
+button, a SIBLING of `.nav-wrapper` inside `.header.block`. It had never been
+visible in that state because the sticky menu outranked the entire header and
+covered it; with the header now on top, it started floating on the page on its
+own — a green button with no bar under it.
+
+It belongs to the header, so it now leaves and returns with the header, on the
+same `data-sfx-nav` state.
+
+**The lesson, and it is the third time this page has taught a version of it:**
+raising something in the stacking order does not only fix what was covering it,
+it reveals everything that thing was covering. After changing a z-index, look at
+what has appeared, not only at what has stopped disappearing.
+
+Files: `solutions-fx/solutions.css`, `header-layers.js`; cache bust `?v=17`.

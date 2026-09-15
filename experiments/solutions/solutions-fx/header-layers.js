@@ -42,8 +42,27 @@
     document.documentElement.style.setProperty('--sfx-nav-h', h + 'px');
   }
 
+  /* nav-fx owns the bar's visibility and marks it with its own classes. The
+     sticky section menu is a COUSIN of the bar, not a descendant, so no CSS
+     selector can read that state — mirror it onto <html> and the stylesheet
+     can park the menu under the bar while it is down and at the very top while
+     it is away, which is what stops the strip the bar occupies from ever being
+     an empty gap. No class at all means the bar has not been touched yet:
+     that is its visible state, so "shown" is the default. */
+  function mirror() {
+    var bar = document.querySelector(SEL);
+    document.documentElement.setAttribute(
+      'data-sfx-nav', bar && bar.classList.contains('nav-hidden') ? 'hidden' : 'shown');
+  }
+
   function start() {
     measure();
+    mirror();
+
+    var bar0 = document.querySelector(SEL);
+    if (bar0 && window.MutationObserver) {
+      new MutationObserver(mirror).observe(bar0, { attributes: true, attributeFilter: ['class'] });
+    }
 
     /* The height changes at the breakpoint, and the breakpoint is crossed by
        resizing, by rotating a phone, and by a font finishing loading. */
@@ -61,6 +80,7 @@
     var menu = document.querySelector('.anchor-secondary-menu-wrapper');
     return {
       navHeight: last,
+      navState: document.documentElement.getAttribute('data-sfx-nav'),
       published: document.documentElement.style.getPropertyValue('--sfx-nav-h') || null,
       navZ: bar ? getComputedStyle(bar).zIndex : null,
       headerZ: (function () {
