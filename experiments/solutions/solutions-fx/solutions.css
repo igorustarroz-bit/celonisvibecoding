@@ -182,13 +182,28 @@ html[data-sfx-nav="hidden"] .header-wrapper a.button.conversion {
    ------------------------------------------------------------------------- */
 html[data-sfx-page="home"] a.link-with-arrow[href$="supply-chain/index.html"] .icon-only {
   background-color: #5cfe50;
+  /* The arrow is drawn by lib/sprite.js as `stroke="currentColor"`, and the
+     saved page's `color` here is #666. On grey that reads as black; on the
+     brand green it reads as a grey arrow on a green tile. `fill` was already
+     black and says nothing — this glyph is a stroke, not a fill, which is why
+     the computed `fill: rgb(0,0,0)` looked right while the arrow was not.
+     Igor, 2026-09-15: "la flecha debería estar en color negro". */
+  color: #000;
+}
+/* …and the colour has to be set on the elements that actually carry it. The
+   saved page declares `color: #666` again on the icon span inside, so setting
+   it on the tile alone never reaches the glyph — inheritance loses to an
+   explicit declaration further down. */
+html[data-sfx-page="home"] a.link-with-arrow[href$="supply-chain/index.html"] .icon-only .icon,
+html[data-sfx-page="home"] a.link-with-arrow[href$="supply-chain/index.html"] .icon-only svg,
+html[data-sfx-page="home"] a.link-with-arrow[href$="supply-chain/index.html"] .icon-only use {
+  color: #000;
 }
 html[data-sfx-page="home"] a.link-with-arrow[href$="supply-chain/index.html"]:hover .icon-only,
 html[data-sfx-page="home"] a.link-with-arrow[href$="supply-chain/index.html"]:focus-visible .icon-only {
   background-color: #46e63a;
 }
-/* The arrow is already black and stays black: the saved page draws it with
-   `fill: #000`, which is the same pairing the green CTA uses for its label. */
+/* Black on green is the same pairing the page's own "Try for free" uses. */
 
 /* The travelling title. view-transitions.js puts `.sfx-vt-title` on the card
    heading rather than the CSS naming it directly, because the heading carries

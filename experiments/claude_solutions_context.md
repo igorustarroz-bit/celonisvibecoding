@@ -1179,3 +1179,40 @@ it reveals everything that thing was covering. After changing a z-index, look at
 what has appeared, not only at what has stopped disappearing.
 
 Files: `solutions-fx/solutions.css`, `header-layers.js`; cache bust `?v=17`.
+
+---
+
+## 25. The green button's arrow (2026-09-15)
+
+**Igor:** *"La flecha del botón verde de supply chain debería estar en color
+negro."*
+
+It was #666. Two things hid that from the check made when the button was built:
+
+1. **`fill` said black and meant nothing.** The computed style on the `<svg>` read
+   `fill: rgb(0, 0, 0)`, which is what was inspected and taken as proof. But this
+   glyph is a **stroke, not a fill** — `lib/sprite.js` draws it as
+   `<path stroke="currentColor" stroke-width="1.6" fill="none">`. The colour that
+   matters is `color`, and the saved page sets it to `#666`. On the original grey
+   tile that passes for black; on brand green it is a grey arrow on a green square.
+2. **Setting `color` on the tile did not reach the glyph.** The saved page declares
+   `color: #666` again on the icon span inside `.icon-only`, and an explicit
+   declaration further down beats inheritance from above. The rule has to name the
+   elements that actually carry the colour:
+
+```css
+… .icon-only,
+… .icon-only .icon,
+… .icon-only svg,
+… .icon-only use { color: #000; }
+```
+
+Verified by pixels rather than by computed style, which is what would have caught
+it the first time: the 60 darkest pixels of the tile now average **exactly
+(0, 0, 0)**; before, (102, 102, 102).
+
+**The rule:** when a colour looks wrong on an icon, check which property draws it.
+`fill` and `color` are both "the icon's colour" until the icon turns out to be a
+stroke, and a computed value that looks right is not evidence that the pixels are.
+
+Files: `solutions-fx/solutions.css`; cache bust `?v=18`.
