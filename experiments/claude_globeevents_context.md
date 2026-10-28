@@ -253,6 +253,27 @@ staggered across the set, and bring the white fill in just behind each stroke.
 Madrid is 68 paths. The whole thing takes `badgeDrawMs` (1100 ms) and starts on
 the badge's own turn in the card's sequence.
 
+Three things that cost time here:
+
+1. **The hand-over has to be a swap, not a cross-fade.** Fading the stroke out
+   while the fill came in left a moment where the shape carried both, and that
+   read as the line changing weight (Igor, 2026-10-28). Both now flip in 1 ms
+   at the same instant; measured stroke+fill overlap went from 0.84 to 0. The
+   width itself (`badgeStroke`) never animated.
+2. **`getBBox()` does not work on a `display:none` subtree.** `badgeOrder`
+   orders the shapes by their vertical position, and `armDraw()` runs *before*
+   the card is shown, so every `cy` came back 0 and both directions silently
+   fell back to document order — which in these files happens to run
+   bottom-to-top, so "upwards" looked correct and only "downwards" gave it
+   away. The bbox is measured in `runDraw()` now, with the card on screen.
+   `getTotalLength()` works either way, which is why the dashes were always
+   right.
+3. **Two colours, not one.** `badgeDrawColor` is the line it is drawn with and
+   `badgeFillColor` what it ends up as: the same value on both gives one
+   colour, and white→green or green→white is just the two swapped.
+   `badgeGlow` adds a `drop-shadow`, and `badgeGlowDraw` keeps that halo for
+   the drawing only — it fades out 60 ms after the last stroke lands.
+
 ⚠️ That needs the SVG **inlined in the document** — an `<img>` cannot be
 animated — so the four files are fetched once at boot into `BADGE_SVG`.
 **`fetch()` on `file://` is blocked by CORS and these pages must keep working
