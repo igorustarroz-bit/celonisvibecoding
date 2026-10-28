@@ -245,6 +245,20 @@ It **grows out of the point that was clicked** (Igor, 2026-10-28):
 
 Knobs: `cardGrowMs`, `cardStaggerMs`. End to end it measures ~600 ms.
 
+### The badge is drawn, not faded
+
+The badges are **filled** paths, so "line drawing" means: stroke each path with
+`stroke-dasharray = stroke-dashoffset = getTotalLength()`, run the offset to 0
+staggered across the set, and bring the white fill in just behind each stroke.
+Madrid is 68 paths. The whole thing takes `badgeDrawMs` (1100 ms) and starts on
+the badge's own turn in the card's sequence.
+
+⚠️ That needs the SVG **inlined in the document** — an `<img>` cannot be
+animated — so the four files are fetched once at boot into `BADGE_SVG`.
+**`fetch()` on `file://` is blocked by CORS and these pages must keep working
+from `file://`** (repo rule), so a failed prefetch is not an error: `setBadge()`
+falls back to the `<img>` and the plain fade. `badgeDraw` 0 forces that path.
+
 ## 9. The card (Figma → CSS)
 
 Source: `Web DS | Components`, file `tBZiqZtdfjJXmCflrpjN1U`, frame
