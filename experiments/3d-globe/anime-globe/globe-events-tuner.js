@@ -65,6 +65,8 @@
         ["cardOffsetPx", "Gap from the marker (px)", 0, 80, 1],
         ["cardGrowMs", "Grow out of the marker (ms)", 80, 900, 10],
         ["cardStaggerMs", "Contents, one after the other (ms)", 0, 300, 5],
+        ["badgeDraw", "Draw the badge outline (0 = plain fade)", [0, 1]],
+        ["badgeDrawMs", "Badge drawing time (ms)", 200, 3000, 50],
         ["cardBorder", "Hairline border (0 = pure Figma black)", [0, 1]],
         ["pauseSpin", "Pause the spin while open", [0, 1]]
       ]]

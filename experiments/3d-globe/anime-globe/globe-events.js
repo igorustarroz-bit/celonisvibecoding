@@ -51,7 +51,7 @@
     // gives every destination exactly one flight in and one out; 5 and 6 add
     // the diagonals and anything above that puts several flights on the same
     // corridor, evenly spaced in time. Up to 20.
-    arcCount: 4,
+    arcCount: 6,
     arcAltitude: 0.075,     // peak height: fraction of the angular distance, x R.
                             // The flights hug the globe; much above ~0.09 and they
                             // arch out of the hero.
@@ -82,6 +82,11 @@
     cardOffsetPx: 20,       // gap between the marker and the card edge
     cardGrowMs: 340,        // the card grows out of the marker you clicked
     cardStaggerMs: 70,      // then its contents come in, one after the other
+    // The city badge is not faded in: its outline is drawn, stroke by stroke,
+    // and the white fill arrives behind it. Needs the SVG inlined, so it falls
+    // back to the plain fade when the file cannot be read (see setBadge).
+    badgeDraw: 1,
+    badgeDrawMs: 1100,
     cardBorder: 1,          // 0 = pure Figma black card with no hairline
     pauseSpin: 1,           // 1 = the auto-spin stops while a card is open
     events: [
@@ -145,10 +150,94 @@
 
   var cardCity = card.querySelector('.ge-card__city');
   var cardDate = card.querySelector('.ge-card__date');
-  var cardBadge = card.querySelector('.ge-card__badge img');
+  var cardBadge = card.querySelector('.ge-card__badge');
   card.querySelector('.ge-card__btn').addEventListener('click', function (e) {
     e.preventDefault(); // inert on a client replica — nothing links out (rule 13)
   });
+
+  /* ---- the city badge, drawn rather than faded ----------------------------
+     The badges are filled paths, so "line drawing" means: stroke the outline
+     with a dash offset running to 0, then bring the fill in behind it. That
+     needs the SVG inlined in the document — an <img> cannot be animated — so
+     the files are fetched once at boot. fetch() on file:// is blocked by CORS,
+     and these pages must keep working from file://, so a failure here is not
+     an error: setBadge falls back to the <img> and the plain fade. */
+  var BADGE_SVG = {};
+
+  function badgeUrl(id) { return 'anime-globe/badges/badge-' + id + '.svg'; }
+
+  function prefetchBadges() {
+    if (!window.fetch) return;
+    GE.events.forEach(function (ev) {
+      fetch(badgeUrl(ev.id)).then(function (r) {
+        return r.ok ? r.text() : null;
+      }).then(function (txt) {
+        if (txt && txt.indexOf('<svg') >= 0) BADGE_SVG[ev.id] = txt;
+      }).catch(function () {});
+    });
+  }
+
+  function setBadge(id) {
+    var inset = BADGE_INSET[id] || '4%';
+    if (GE.badgeDraw && BADGE_SVG[id]) {
+      cardBadge.innerHTML = BADGE_SVG[id];
+      var svg = cardBadge.querySelector('svg');
+      if (svg) {
+        svg.style.inset = inset;
+        svg.setAttribute('aria-hidden', 'true');
+        armDraw(svg);
+        return svg;
+      }
+    }
+    cardBadge.innerHTML = '<img alt="">';
+    var im = cardBadge.querySelector('img');
+    im.style.inset = inset;
+    im.src = badgeUrl(id);
+    return null;
+  }
+
+  function badgePaths(svg) {
+    var all = svg.querySelectorAll('path'), out = [], i, len;
+    for (i = 0; i < all.length; i++) {
+      try { len = all[i].getTotalLength(); } catch (e) { len = 0; }
+      if (len > 0.5) out.push([all[i], len]);
+    }
+    return out;
+  }
+
+  function armDraw(svg) {                        // the un-drawn state
+    var ps = badgePaths(svg), i;
+    for (i = 0; i < ps.length; i++) {
+      var el = ps[i][0], len = ps[i][1];
+      el.style.transition = 'none';
+      el.style.fill = 'rgba(255,255,255,0)';
+      el.style.stroke = '#ffffff';
+      el.style.strokeWidth = '0.7';
+      el.style.strokeLinecap = 'round';
+      el.style.strokeDasharray = len.toFixed(2);
+      el.style.strokeDashoffset = len.toFixed(2);
+    }
+    svg.__gePaths = ps;
+  }
+
+  function runDraw(svg) {
+    var ps = svg.__gePaths || badgePaths(svg);
+    var n = ps.length || 1;
+    var total = Math.max(120, GE.badgeDrawMs);
+    var each = total * 0.45;                     // how long one stroke takes
+    var spread = total * 0.55;                   // when the last one starts
+    void svg.getBoundingClientRect();            // flush the armed state
+    for (var i = 0; i < ps.length; i++) {
+      var el = ps[i][0], d = (i / n) * spread;
+      el.style.transition =
+        'stroke-dashoffset ' + each.toFixed(0) + 'ms cubic-bezier(0.3,0.7,0.3,1) ' + d.toFixed(0) + 'ms,' +
+        'fill 320ms ease ' + (d + each * 0.65).toFixed(0) + 'ms,' +
+        'stroke 320ms ease ' + (d + each * 0.65).toFixed(0) + 'ms';
+      el.style.strokeDashoffset = '0';
+      el.style.fill = '#ffffff';
+      el.style.stroke = 'rgba(255,255,255,0)';
+    }
+  }
 
   function unitVec(lat, lon) {
     var phi = lat * Math.PI / 180, lam = lon * Math.PI / 180;
@@ -518,8 +607,7 @@
     openId = m.ev.id;
     cardCity.textContent = m.ev.city;
     cardDate.textContent = m.ev.date;
-    cardBadge.src = 'anime-globe/badges/badge-' + m.ev.id + '.svg';
-    cardBadge.style.inset = BADGE_INSET[m.ev.id] || '4%';
+    var svg = setBadge(m.ev.id);
     card.classList.toggle('no-border', !GE.cardBorder);
     card.classList.remove('is-open');
     card.style.setProperty('--ge-grow', GE.cardGrowMs + 'ms');
@@ -540,6 +628,12 @@
     // the callback queues behind the globe's own (heavy) render frame.
     void card.offsetWidth;
     card.classList.add('is-open');
+
+    if (svg) {                                   // the badge is drawn on its turn
+      var at = GE.cardGrowMs * 0.7 + 2 * GE.cardStaggerMs;
+      var id = m.ev.id;
+      setTimeout(function () { if (openId === id) runDraw(svg); }, at);
+    }
   }
 
   function closeCard() {
@@ -668,6 +762,8 @@
   function loop() { frame(false); requestAnimationFrame(loop); }
 
   // globe.js may still be booting
+  prefetchBadges();
+
   (function waitForEarth(tries) {
     if (window.__earth) {
       applyStyle();

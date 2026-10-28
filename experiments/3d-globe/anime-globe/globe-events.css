@@ -153,13 +153,15 @@
   transform: translate(-50%, -50%);
   pointer-events: none;
 }
-.ge-card__badge img {
+.ge-card__badge img,
+.ge-card__badge svg {
   position: absolute;
-  inset: 4% 5%;
+  inset: 4% 5%;          /* per city, set from JS */
   display: block;
   width: auto;
   height: auto;
   max-width: none;
+  overflow: visible;
 }
 
 .ge-card__btn {
