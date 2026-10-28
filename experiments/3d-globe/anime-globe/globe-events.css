@@ -13,8 +13,14 @@
   height: 100%;
   display: block;
   pointer-events: none;   /* the globe keeps its drag, inertia and needle focus */
-  /* no filter here: #earth-canvas carries blur(0.6px), the markers must stay sharp */
 }
+
+/* Two layers, because a single blur strong enough for the glow turned the
+   half-size cylinder into a blob. Both values are set from JS
+   (GLOBE_EVENTS.blurPx / .discBlurPx) so the tuner can reach them; these are
+   only the values that apply before the first frame. */
+.ge-canvas--soft { filter: blur(1.9px); }   /* glow, ripple, flight arcs */
+.ge-canvas--disc { filter: blur(0.4px); }   /* the cylinders, on top */
 
 .ge-layer {
   position: fixed;

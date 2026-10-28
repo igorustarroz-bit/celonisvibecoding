@@ -17,27 +17,36 @@
 
   var GE = window.GLOBE_EVENTS = {
     // ---- marker: a very flat cylinder standing on the sphere
-    discRadiusDeg: 1.7,     // radius on the sphere, in degrees of arc
-    discHeight: 0.018,      // extrusion along the normal, as a fraction of R
+    discRadiusDeg: 0.85,    // radius on the sphere, in degrees of arc
+    discHeight: 0.014,      // extrusion along the normal, as a fraction of R
     discColor: '#5cfe50',
     discWall: 0.42,         // how much darker the side wall is (0 = same, 1 = black)
-    discEdge: 0.5,          // brightness of the rim drawn around the top face
+    discEdge: 0,            // rim around the top face (0 = none; it reads as a hard white line)
     discShade: 0.55,        // light/shadow across the top face (0 = flat colour)
-    discGlow: 0.55,         // soft glow under the marker (0 = none)
+    discGlow: 0.95,         // soft glow under the marker (0 = none)
+    // Two layers of blur. Igor asked for everything green to sit softer, but at
+    // half size a single heavy blur turned the cylinder into a blob, so the glow,
+    // the ripple and the arcs go on a heavily blurred canvas and the cylinder
+    // itself on a nearly sharp one above it.
+    blurPx: 1.9,            // blur of the soft layer (glow, ripple, arcs)
+    discBlurPx: 0.4,        // blur of the marker layer (0 = fully sharp)
     hoverGrow: 1.35,        // radius multiplier on hover / while open
     limbFadeZ: 0.18,        // markers fade in over this view-space z
     // ---- ripple on the surface (replaces the old CSS halo)
     pulse: 1,
     pulseMs: 2400,
-    rippleScale: 3.2,       // how far the ripple travels, as a multiple of the radius
+    rippleScale: 3.6,       // how far the ripple travels, as a multiple of the radius
+    rippleSoft: 0.45,       // 0 = tight ring, 1 = a wide haze (never a hard ellipse)
     // ---- flight arcs between the cities
     arcs: 1,
     arcAll: 1,              // 1 = every pair, 0 = a single chain through the cities
-    arcAltitude: 0.42,      // peak height: fraction of the angular distance, × R
+    arcAltitude: 0.055,     // peak height: fraction of the angular distance, x R.
+                            // Igor, 2026-10-28: the flights hug the globe, they do not
+                            // arch away from it — anything much above ~0.08 leaves the hero.
     arcWidthRatio: 0.0013,  // stroke width / canvas buffer size
-    arcOpacity: 0.5,
+    arcOpacity: 0.55,
     arcColor: '#5cfe50',
-    arcColor2: '#ffffff',
+    arcColor2: '#b7ffae',   // a lighter green — no white anywhere on the globe
     arcSamples: 72,
     // ---- the "flight" travelling along each arc
     flights: 1,
@@ -76,10 +85,16 @@
      =================================================================== */
   var world = canvas.parentNode;
   if (world && window.getComputedStyle(world).position === 'static') world.style.position = 'relative';
-  var fx = document.createElement('canvas');
-  fx.className = 'ge-canvas';
-  fx.setAttribute('aria-hidden', 'true');
-  world.insertBefore(fx, canvas.nextSibling);
+  function overlay(cls, after) {
+    var el = document.createElement('canvas');
+    el.className = 'ge-canvas ' + cls;
+    el.setAttribute('aria-hidden', 'true');
+    world.insertBefore(el, after.nextSibling);   // stacking order IS the DOM order here
+    return el;
+  }
+  var soft = overlay('ge-canvas--soft', canvas); // glow, ripple, flight arcs — heavily blurred
+  var fx = overlay('ge-canvas--disc', soft);     // the cylinders — nearly sharp, on top
+  var sctx = soft.getContext('2d');
   var fctx = fx.getContext('2d');
 
   /* ===================================================================
@@ -208,7 +223,7 @@
   // AND inside the silhouette — that is exact for an orthographic camera.
   function occluded(v) { return v[2] < 0 && (v[0] * v[0] + v[1] * v[1]) < 1; }
 
-  function drawDisc(g, v, R, cx, cy, yOff, rPx, col, alpha, t) {
+  function drawDisc(g, gs, v, R, cx, cy, yOff, rPx, col, alpha, t) {
     var nz = v[2];
     var ang = Math.atan2(-v[1], v[0]);          // screen direction of the normal
     var bx = cx + v[0] * R, by = cy - v[1] * R + yOff;          // bottom face centre
@@ -217,24 +232,38 @@
     var minor = Math.max(0.35, rPx * nz);       // foreshortening of the circle
     var i, a, pts = [];
 
-    if (GE.discGlow > 0) {
-      var gl = g.createRadialGradient(tx, ty, 0, tx, ty, rPx * 3.2);
+    if (GE.discGlow > 0) {                       // on the soft layer
+      var gl = gs.createRadialGradient(tx, ty, 0, tx, ty, rPx * 4.2);
       gl.addColorStop(0, rgba(col, 0.42 * GE.discGlow * alpha));
       gl.addColorStop(1, rgba(col, 0));
-      g.fillStyle = gl;
-      g.beginPath();
-      g.ellipse(tx, ty, rPx * 3.2, Math.max(0.5, rPx * 3.2 * nz), ang, 0, 2 * Math.PI);
-      g.fill();
+      gs.fillStyle = gl;
+      gs.beginPath();
+      gs.ellipse(tx, ty, rPx * 4.2, Math.max(0.5, rPx * 4.2 * nz), ang, 0, 2 * Math.PI);
+      gs.fill();
     }
 
-    if (GE.pulse) {                              // a ripple running across the surface
+    if (GE.pulse) {
+      // A ripple running across the surface. Stroking an ellipse drew a hard
+      // ring that read as an orbit around the marker (Igor, 2026-10-28), so it
+      // is a soft radial band instead, squashed into the tangent plane by
+      // scaling the context rather than by stroking an ellipse path.
       var ph = ((t % GE.pulseMs) / GE.pulseMs);
       var rr = rPx * (1 + (GE.rippleScale - 1) * ph);
-      g.strokeStyle = rgba(col, 0.55 * (1 - ph) * alpha);
-      g.lineWidth = Math.max(1, rPx * 0.16);
-      g.beginPath();
-      g.ellipse(bx, by, rr, Math.max(0.35, rr * nz), ang, 0, 2 * Math.PI);
-      g.stroke();
+      var sf = Math.max(0.05, Math.min(0.95, GE.rippleSoft));
+      gs.save();
+      gs.translate(bx, by);
+      gs.rotate(ang);
+      gs.scale(Math.max(0.05, nz), 1);
+      var rg = gs.createRadialGradient(0, 0, 0, 0, 0, rr);
+      rg.addColorStop(0, rgba(col, 0));
+      rg.addColorStop(Math.max(0.05, 1 - sf), rgba(col, 0));
+      rg.addColorStop(1 - sf * 0.35, rgba(col, 0.4 * (1 - ph) * (1 - ph) * alpha));
+      rg.addColorStop(1, rgba(col, 0));
+      gs.fillStyle = rg;
+      gs.beginPath();
+      gs.arc(0, 0, rr, 0, 2 * Math.PI);
+      gs.fill();
+      gs.restore();
     }
 
     for (i = 0; i < 28; i++) {                   // the silhouette of the cylinder
@@ -267,7 +296,7 @@
     g.fill();
 
     if (GE.discEdge > 0) {
-      g.strokeStyle = rgba([255, 255, 255], GE.discEdge * alpha * 0.8);
+      g.strokeStyle = rgba(mix(col, 1.35), GE.discEdge * alpha * 0.8);
       g.lineWidth = Math.max(0.8, rPx * 0.1);
       g.stroke();
     }
@@ -331,7 +360,7 @@
       for (i = tail; i < head; i++) {
         if (!vis[i] || !vis[i + 1]) continue;
         var f = (i - tail) / Math.max(1, head - tail);
-        g.strokeStyle = rgba(c2, Math.min(1, 0.9 * f * f * alpha));
+        g.strokeStyle = rgba(c2, Math.min(1, 0.85 * f * f * alpha));
         g.lineWidth = lw * (1 + 1.1 * f);
         g.beginPath();
         g.moveTo(pts[i][0], pts[i][1]);
@@ -339,7 +368,7 @@
         g.stroke();
       }
       if (vis[head]) {
-        g.fillStyle = rgba(c2, 0.95 * alpha);
+        g.fillStyle = rgba(c2, 0.9 * alpha);
         g.beginPath();
         g.arc(pts[head][0], pts[head][1], lw * GE.flightSize, 0, 2 * Math.PI);
         g.fill();
@@ -436,9 +465,11 @@
     if (!rect.width || !rect.height) return;
 
     if (fx.width !== size || fx.height !== canvas.height) {
-      fx.width = size; fx.height = canvas.height;
+      fx.width = soft.width = size;
+      fx.height = soft.height = canvas.height;
     }
     fctx.clearRect(0, 0, fx.width, fx.height);
+    sctx.clearRect(0, 0, soft.width, soft.height);
 
     var m3 = viewMatrix(cfg, st);
     var R = size * cfg.radiusRatio * st.scale;
@@ -451,7 +482,7 @@
     var fade = GE.limbFadeZ > 0 ? GE.limbFadeZ : 0.0001;
 
     if (alpha <= 0.02) { markers.forEach(hide); return; }
-    if (GE.arcs) drawArcs(fctx, m3, R, c, c, yOff, size, alpha, t);
+    if (GE.arcs) drawArcs(sctx, m3, R, c, c, yOff, size, alpha, t);
 
     for (var i = 0; i < markers.length; i++) {
       var mk = markers[i];
@@ -464,7 +495,7 @@
       }
       var grow = (openId === mk.ev.id || mk.hover) ? GE.hoverGrow : 1;
       var rPx = Math.sin(GE.discRadiusDeg * Math.PI / 180) * R * grow;
-      var top = drawDisc(fctx, v, R, c, c, yOff, rPx, col, op, t);
+      var top = drawDisc(fctx, sctx, v, R, c, c, yOff, rPx, col, op, t);
 
       mk.x = rect.left + top[0] * kx;             // viewport position of the top face
       mk.y = rect.top + top[1] * ky;
@@ -479,7 +510,11 @@
 
   function hide(mk) { if (mk.shown) { mk.el.style.display = 'none'; mk.shown = false; } }
 
-  function applyStyle() { card.classList.toggle('no-border', !GE.cardBorder); }
+  function applyStyle() {
+    card.classList.toggle('no-border', !GE.cardBorder);
+    soft.style.filter = GE.blurPx > 0 ? 'blur(' + GE.blurPx + 'px)' : '';
+    fx.style.filter = GE.discBlurPx > 0 ? 'blur(' + GE.discBlurPx + 'px)' : '';
+  }
 
   function loop() { frame(false); requestAnimationFrame(loop); }
 

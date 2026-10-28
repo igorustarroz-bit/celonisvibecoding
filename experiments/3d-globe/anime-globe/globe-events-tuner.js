@@ -25,21 +25,27 @@
         ["discEdge", "Rim on the top face", 0, 1.5, 0.05],
         ["discShade", "Shading across the top face", 0, 1, 0.05],
         ["discGlow", "Glow", 0, 2, 0.05],
+        ["blurPx", "Blur of the glow / arcs layer (px)", 0, 6, 0.1],
+        ["discBlurPx", "Blur of the cylinder itself (px)", 0, 3, 0.1],
         ["hoverGrow", "Grow on hover / open", 1, 2.5, 0.05],
-        ["limbFadeZ", "Fade-in depth at the limb", 0.02, 0.6, 0.01]
+        ["limbFadeZ", "Fade-in depth at the limb", 0.02, 0.6, 0.01],
+        ["@colour", "Marker colour", "discColor"]
       ]],
       ["Ripple", [
         ["pulse", "Ripple on the surface", [0, 1]],
         ["pulseMs", "Period (ms)", 600, 6000, 100],
-        ["rippleScale", "Travel (x radius)", 1.4, 6, 0.1]
+        ["rippleScale", "Travel (x radius)", 1.4, 6, 0.1],
+        ["rippleSoft", "Softness (0 = tight ring)", 0.05, 0.95, 0.05]
       ]],
       ["Flight arcs", [
         ["arcs", "Draw the arcs", [0, 1]],
         ["arcAll", "Every pair (0 = one chain)", [0, 1]],
-        ["arcAltitude", "Arc height", 0.05, 1.2, 0.01],
+        ["arcAltitude", "Arc height (hugs the globe)", 0.005, 0.5, 0.005],
         ["arcWidthRatio", "Stroke width (x buffer)", 0.0004, 0.004, 0.0001],
         ["arcOpacity", "Opacity", 0, 1, 0.02],
-        ["arcSamples", "Samples per arc", 16, 160, 4]
+        ["arcSamples", "Samples per arc", 16, 160, 4],
+        ["@colour", "Arc colour (ends)", "arcColor"],
+        ["@colour", "Arc colour (middle + comet)", "arcColor2"]
       ]],
       ["Flights", [
         ["flights", "Comet along the arc", [0, 1]],
@@ -67,7 +73,8 @@
       panel.section(group[0]);
       group[1].forEach(function (item) {
         var key = item[0], label = item[1];
-        if (Array.isArray(item[2])) panel.choice(label, key, item[2]);
+        if (key === "@colour") panel.colour(label, item[2]);
+        else if (Array.isArray(item[2])) panel.choice(label, key, item[2]);
         else panel.slider(label, key, item[2], item[3], item[4]);
       });
     });
