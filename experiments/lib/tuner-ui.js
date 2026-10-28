@@ -362,7 +362,15 @@
     var wrap = el('div', 'tu-chips');
     var chips = values.map(function (v) {
       var chip = el('div', 'tu-chip', String(v));
-      chip.addEventListener('click', function () { self._commit(entry, v, extra); });
+      chip.addEventListener('click', function () {
+        self._commit(entry, v, extra);
+        // _commit writes the value, the read-out and the amber mark, but it
+        // does NOT repaint the control: a slider repaints itself from inside
+        // its own drag and colour() calls paint() in its write callback, so
+        // chips were the one control left without one — the value moved and
+        // the highlight stayed on the old chip. (Igor, 2026-10-28.)
+        entry.paint();
+      });
       wrap.appendChild(chip);
       return chip;
     });

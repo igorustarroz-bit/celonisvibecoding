@@ -75,6 +75,9 @@
         ["badgeGlow", "Badge glow (uses the line colour)", 0, 6, 0.1],
         ["badgeGlowLayers", "Glow layers stacked", [1, 2, 3]],
         ["badgeGlowDraw", "Glow only while drawing", [0, 1]],
+        ["badgeGlowPulse", "Glow pulses once drawn", [0, 1]],
+        ["badgeGlowPulseMs", "Glow pulse period (ms)", 400, 8000, 100],
+        ["badgeGlowPulseMin", "Glow pulse dips to", 0.05, 1, 0.05],
         ["cardBorder", "Hairline border (0 = pure Figma black)", [0, 1]],
         ["pauseSpin", "Pause the spin while open", [0, 1]]
       ]]

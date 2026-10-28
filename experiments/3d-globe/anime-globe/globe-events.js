@@ -100,9 +100,14 @@
     // tints from one colour to the other, which is pure colour and moves no
     // geometry. badgeTintMs is how long that takes (0 = straight to the fill).
     badgeTintMs: 650,
-    badgeGlow: 2.9,         // halo around the badge (0 = none)
+    badgeGlow: 3,           // halo around the badge (0 = none)
     badgeGlowLayers: 2,     // stacked drop-shadows; one alone barely shows on a hairline
     badgeGlowDraw: 0,       // 1 = only while it is being drawn, 0 = always on
+    // When the halo stays (badgeGlowDraw 0) it breathes behind the finished
+    // badge. It starts once the drawing and the tint have landed.
+    badgeGlowPulse: 1,
+    badgeGlowPulseMs: 2400,
+    badgeGlowPulseMin: 0.45, // how far down it dips, as a fraction of badgeGlow
     cardBorder: 1,          // 0 = pure Figma black card with no hairline
     pauseSpin: 1,           // 1 = the auto-spin stops while a card is open
     events: [
@@ -314,12 +319,23 @@
       }
     }
 
+    clearTimeout(svg.__geGlowT);
+    var glowEnd = spread + each + tint + 60;
     if (GE.badgeGlow > 0 && GE.badgeGlowDraw) {  // the halo belongs to the drawing
-      clearTimeout(svg.__geGlowT);
       svg.__geGlowT = setTimeout(function () {
         svg.style.transition = 'filter 450ms ease';
         svg.style.filter = badgeGlowCss(0);
-      }, spread + each + tint + 60);
+      }, glowEnd);
+    } else if (GE.badgeGlow > 0 && GE.badgeGlowPulse && svg.animate) {
+      // The halo stays and breathes behind the finished badge.
+      svg.__geGlowT = setTimeout(function () {
+        var lo = Math.max(0.02, Math.min(1, GE.badgeGlowPulseMin));
+        svg.__geAnims.push(svg.animate(
+          [{ filter: badgeGlowCss(1) }, { filter: badgeGlowCss(lo) }],
+          { duration: Math.max(200, GE.badgeGlowPulseMs) / 2,
+            direction: 'alternate', iterations: Infinity, easing: 'ease-in-out' }
+        ));
+      }, glowEnd);
     }
   }
 
