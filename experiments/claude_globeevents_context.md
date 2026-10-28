@@ -219,7 +219,16 @@ plus a head) travels along each arc, staggered by arc index.
 - Keyboard: each hit area is `role="button" tabindex="0"`, Enter/Space toggles.
 - The hit area is a separate invisible `.ge-hit` circle, `2.2 ×` the cylinder's
   screen radius with a **24 px floor**, all of it multiplied by **`hitGrow`**
-  (2 since 2026-10-28, so 48 px at these marker sizes — Igor asked for double).
+  — Igor doubled it twice on 2026-10-28, so **4 → ~96 px** at these marker
+  sizes.
+  ⚠️ **A big target costs the drag.** `.ge-hit` is `pointer-events: auto`, so a
+  `pointerdown` inside it never reaches `#earth-canvas` and the globe does not
+  spin from there — verified with `elementFromPoint`. At `hitGrow` 4 the
+  targets cover **2.9 %** of the globe's disc, which is a small dead zone but a
+  real one. If it ever gets in the way, the fix is to forward the gesture:
+  construct a `PointerEvent` with the same `pointerId` in the hit element's
+  `pointerdown` and dispatch it on the canvas, so `setPointerCapture` picks the
+  drag up. Not done — the knob is the cheaper answer.
   The marker itself is painted on the canvas and a small puck is not a target.
   The circle is `display: none` in CSS until the first frame places it; without
   that, a marker that has not been drawn yet sits clickable in the top-left

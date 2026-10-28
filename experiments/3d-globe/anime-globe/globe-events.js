@@ -33,8 +33,10 @@
     discBlurPx: 0.6,        // blur of the marker layer (0 = fully sharp)
     hoverGrow: 1.35,        // radius multiplier on hover / while open
     // The clickable circle is 2.2x the cylinder's screen radius with a 24px
-    // floor, all of it multiplied by this. 2 = Igor's doubled target.
-    hitGrow: 2,
+    // floor, all of it multiplied by this. Igor doubled it twice: 4 puts the
+    // target at ~96px. See the note in claude_globeevents_context.md §7 about
+    // what a large target costs on the drag.
+    hitGrow: 4,
     limbFadeZ: 0.18,        // markers fade in over this view-space z
     // ---- the pulse: an ultra-flat ghost cylinder growing out of the marker
     pulse: 1,
