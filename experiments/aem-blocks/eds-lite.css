@@ -116,7 +116,9 @@ body {
 .authored td:first-child { width: 40%; color: var(--fnd-color-text-high); }
 
 .note {
-  margin-top: 20px;
+  margin-top: 40px;
+  padding-top: 24px;
+  border-top: 1px solid var(--fnd-color-border-low);
   max-width: 620px;
   color: var(--fnd-color-text-low);
   font-size: var(--fnd-typography-paragraph-s-font-size);
