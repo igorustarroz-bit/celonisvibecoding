@@ -181,7 +181,9 @@ plus a head) travels along each arc, staggered by arc index.
 - Keyboard: each hit area is `role="button" tabindex="0"`, Enter/Space toggles.
 - The hit area is a separate invisible `.ge-hit` circle, `2.2 ×` the cylinder's
   screen radius with a **24 px floor** — the marker itself is painted on the
-  canvas and a small puck is not a touch target.
+  canvas and a small puck is not a touch target. It is `display: none` in CSS
+  until the first frame places it; without that, a marker that has not been
+  drawn yet sits clickable in the top-left corner of the viewport.
 - Hovering or opening grows the marker by `hoverGrow`; markers on the far side
   are not drawn, and the open card closes itself if its city rotates away (it
   cannot happen while `pauseSpin` is on).
@@ -215,6 +217,17 @@ Two deliberate differences from the frame:
 The arrow is inlined in the JS (it is 1 path); the four badges are files because
 they are 21–27 KB each.
 
+### How many destinations, and the round-the-world flight
+
+`cityCount` (1–4) decides how many destinations are live; the rest stay in the
+file and are simply not drawn, and an open card closes if its city is switched
+off under it. With **one** city there is no pair to fly between, so the single
+route becomes a great circle through it — east tangent (`cross([0,1,0], p)`,
+falling back to `[1,0,0]` if the city sits on a pole), `cos θ·p + sin θ·e` for
+θ ∈ [0, 2π]: it leaves heading east, goes round the world and comes home. With
+two cities the ring would draw the same leg twice, so the pair list is cut to
+one.
+
 ### Getting the badges out of Figma
 
 The MCP asset URLs are **not reachable** from the cloud container or from the
@@ -223,11 +236,22 @@ their robots.txt. What worked: open `figma.com` in the **built-in browser** and,
 from a page on that origin, `fetch()` each asset, gzip it with
 `CompressionStream` and return base64 — about 7 KB per badge instead of 25 KB of
 raw path data — then `base64 -d | gunzip` on the device.
-⚠️ **Wrap the base64 at 76 characters.** One single-line 12 KB heredoc came back
-with corrupted bytes in the middle and at the end (`gunzip` CRC error, null bytes
-inside the file). Always re-parse every exported SVG afterwards
-(`python3 -c "import xml.dom.minidom as m; m.parse(f)"`) — one of four was broken
-and still had a plausible file size.
+⚠️ **Wrap the base64 at 76 characters.** Single-line heredocs of 12 KB corrupted
+TWO of the four badges. Tokyo failed loudly (`gunzip` CRC error, null bytes in
+the file). San Francisco failed silently and shipped: the corruption landed in
+the root attribute, `xmlns="htt>n//www.w3.org/2000/svg"`, so the file was still
+well-formed XML of exactly the right size — it passed `xml.dom.minidom.parse`
+and only the browser noticed, by refusing to treat it as SVG and drawing
+nothing.
+
+**So well-formedness is not the check.** Verify the root tag *and* the
+namespace, and then load every exported asset in a real browser and assert
+`naturalWidth > 0`:
+
+```python
+d = minidom.parse(f); r = d.documentElement
+assert r.tagName == 'svg' and r.getAttribute('xmlns') == 'http://www.w3.org/2000/svg'
+```
 
 ## 9. The tuner panel
 
