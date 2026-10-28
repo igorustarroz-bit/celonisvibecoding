@@ -145,3 +145,65 @@ highlight lands on the one you clicked and that exactly one is lit.
    clicking "Copy settings"; a drag turns the value amber; a double-click puts it back.
 4. Bump `?v=` on `tuner-ui.js`/`tuner-ui.css` and on every tuner that changed — Pages caches
    for about 10 minutes.
+
+## `panel.aem(spec)` — the AEM block section (2026-10-28)
+
+The **last section of every panel**, Igor's call. The client's site runs on AEM Edge
+Delivery, where a module is authored as a table of *label / value* rows and the block reads
+its settings from that table and nothing else (`claude_aem_context.md`). The panel already
+knows every knob and which ones were moved, so it is the natural place to hand that table
+over — and it keeps one source of truth per experiment instead of a copy in a page and
+another in a library.
+
+```js
+p.actions();
+p.aem({
+  block: 'Interactive Asset',            // the block's name in their library
+  variants: ['dark-base-theme', 'full-bleed'],  // classes, written in parentheses
+  rows: [['name', 'ContextModel']],      // the rows the block always carries
+  include: 'changed'                     // default; 'declared' emits only `rows`
+});
+p.hint();
+p.mount();
+```
+
+What it renders: the section header, a hint, two buttons and the same selected
+`<pre class="tu-dump">` the Copy settings button uses. Built from `<div>`s and a `<pre>`,
+so rule 12 still holds — `mount()`'s own assertion covers it.
+
+The two copies exist because the two readers are different people:
+
+- **Copy as table** — tab separated, first line the block title with its variants in
+  parentheses. Pasted into the authoring document it lands as a real table, which is how an
+  author writes a block.
+- **Copy as HTML** — the decorated shape EDS produces
+  (`<div class="interactive-asset …" data-block-name="interactive-asset">` with one
+  `<div><div>key</div><div>value</div></div>` per row), for whoever wires it up.
+
+Rows are the declared ones **plus every knob that differs from its default** (that is what
+`include: 'changed'` means, and it is the default). A moved knob replaces a declared row of
+the same name, so a seed value in `rows` is overwritten by what you actually tuned. That is
+the point: tune on the page, copy, paste into the document. Values are written the shortest
+way that parses back to the same number — `0.72`, not `fmt()`'s padded `0.720` — and
+booleans come out as `on` / `off`.
+
+`panel.aemSpec` exposes the same thing to code (`rows()`, `table()`, `html()`, plus `block`
+and `variants`), so the block library page can read every experiment's block without
+opening a panel.
+
+### Who declares what
+
+| Experiment | Tuner | Asset name |
+| --- | --- | --- |
+| 2 — globe event markers | `globe-events-tuner.js` | `GlobeEvents` |
+| 3 — Data Core | `datacore-tuner.js` | `DataCore` |
+| 4 — 3D book | `book-tuner.js` | `Book3D` |
+| 5 — Celosphere seal | `seal-tuner.js` | `CelosphereSeal` |
+| 6 — Context Model | `context-tuner.js` | `ContextModel` |
+| 7 — Solutions | `solutions-tuner.js` | `SolutionsFX` |
+
+All six declare `block: 'Interactive Asset'`, because that is the proposal we are making:
+our scenes registered by name in their asset registry. The module-level mapping (which of
+their M-numbered blocks each experiment belongs to) is a different question and lives in the
+overlap table in `claude_aem_context.md` §3.3. Experiment 1 has no tuner and no entry here —
+it maps to their own `M64 - Video Scroll` block rather than to an asset.

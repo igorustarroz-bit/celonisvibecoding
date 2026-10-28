@@ -95,6 +95,13 @@
     });
 
     p.actions();
+    // Last section: the authored AEM block for this experiment, built from the
+    // knobs above. One source of truth — see experiments/claude_aem_context.md.
+    p.aem({
+      block: 'Interactive Asset',
+      variants: ['dark-base-theme'],
+      rows: [['name', 'Book3D']]
+    });
     p.hint();
     p.mount();
     window.TunerUI.hotkey(p, 't');

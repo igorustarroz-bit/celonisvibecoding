@@ -7,6 +7,10 @@
    on a phone — and a taller scroll container around it gives the effect the
    room it needs to be scrubbed as the block crosses the viewport.
 
+   Both spellings are live since 2026-10-28: the ids for experiment 6's own page,
+   the classes for scenes created through ContextModelScene.create(), which can be
+   placed more than once on a page.
+
    Heights are written by context-core.js (layoutScroll), not here: the sticky
    box must never be taller than what is left of the viewport under the header,
    and the header is measured, never hard-coded.
@@ -17,13 +21,15 @@
    same reason lib/page-shell.css uses `overflow-x: clip` and never `hidden`. */
 .video-wrap-autoplay.context-model-fx { overflow: visible; }
 
-#context-scroll {
+#context-scroll,
+.context-scroll {
   position: relative;
   width: 100%;
   height: 100vh;          /* placeholder until layoutScroll() measures the box */
 }
 
-#context-sticky {
+#context-sticky,
+.context-sticky {
   position: sticky;
   top: 0;                 /* the measured header height, written by JS */
   width: 100%;
@@ -35,7 +41,8 @@
      alpha of its own, so the arrival fade is applied to the canvas. */
 }
 
-#context-stage {
+#context-stage,
+.context-stage {
   display: block;
   width: 100%;
   height: 100%;

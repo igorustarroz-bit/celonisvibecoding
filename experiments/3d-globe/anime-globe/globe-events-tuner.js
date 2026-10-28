@@ -123,6 +123,13 @@
         (e ? " · spin " + (e.state.spin).toFixed(3) : "");
     });
     panel.actions();
+    // Last section: the authored AEM block for this experiment, built from the
+    // knobs above. One source of truth — see experiments/claude_aem_context.md.
+    panel.aem({
+      block: 'Interactive Asset',
+      variants: ['full-width'],
+      rows: [['name', 'GlobeEvents']]
+    });
     panel.hint();
     panel.mount();
     window.TunerUI.hotkey(panel, "t");

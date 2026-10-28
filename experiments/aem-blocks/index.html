@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en" data-sfx-page="aem-blocks">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>AEM block pilot — Context Model as an interactive asset</title>
+<meta name="description" content="Design prototype: experiment 6 packaged against the Adobe Experience Manager Edge Delivery block contract.">
+<link rel="stylesheet" href="../lib/poppins.css">
+<link rel="stylesheet" href="../lib/plex-mono.css">
+<link rel="stylesheet" href="../lib/page-shell.css">
+<link rel="stylesheet" href="./eds-lite.css?v=1">
+</head>
+<body>
+<div class="page-shell">
+
+  <div class="section intro">
+    <h1>Context Model, as an AEM block</h1>
+    <p>Experiment 6 with nothing changed about the scene itself, placed through the
+       site&rsquo;s own <code>interactive-asset</code> block and configured from the
+       authored rows below. The block code is the site&rsquo;s, ported line for line;
+       the scene is still loaded from <code>experiments/context-model/</code>.</p>
+    <p>Unofficial design prototype. Not an official page of the brand shown, and not
+       published or endorsed by them.</p>
+  </div>
+
+  <!-- ------------------------------------------------------------------
+       The block, authored the way EDS delivers it: one row per option,
+       label in the first cell, value in the second. `dark-base-theme` and
+       `full-bleed` are variants, which an author writes in parentheses after
+       the block name in the document.
+       ------------------------------------------------------------------ -->
+  <div class="section full-width">
+    <div data-block="interactive-asset" class="dark-base-theme full-bleed">
+      <div><div>name</div><div>ContextModel</div></div>
+      <div><div>modalHash</div><div>#context-model</div></div>
+      <div><div>camAz</div><div>34</div></div>
+      <div><div>bloomStrength</div><div>0.72</div></div>
+      <div><div>tuner</div><div>on</div></div>
+    </div>
+  </div>
+
+  <div class="section authored">
+    <h2>What the author writes</h2>
+    <p>The same block as a table in the document. Every row reaches the scene; the
+       four keys below <code>name</code> are live settings of the effect.</p>
+    <table>
+      <caption>Interactive Asset (dark-base-theme, full-bleed)</caption>
+      <tbody>
+        <tr><td>name</td><td>ContextModel</td></tr>
+        <tr><td>modalHash</td><td>#context-model</td></tr>
+        <tr><td>camAz</td><td>34</td></tr>
+        <tr><td>bloomStrength</td><td>0.72</td></tr>
+        <tr><td>tuner</td><td>on</td></tr>
+      </tbody>
+    </table>
+    <p class="note">Open the console to see which authored keys were applied and which
+       were ignored. The tuner panel, top right, is the same one experiment 6 ships;
+       the authored values are what it starts from. Full notes in
+       <code>experiments/claude_aem_context.md</code>.</p>
+  </div>
+
+</div>
+
+<script src="./eds-lite.js?v=1"></script>
+<script src="./assets/asset-registry.js?v=1"></script>
+<script src="./assets/context-model.js?v=1"></script>
+</body>
+</html>

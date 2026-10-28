@@ -219,6 +219,13 @@
     }, 500);
 
     panel.actions();
+    // Last section: the authored AEM block for this experiment, built from the
+    // knobs above. One source of truth — see experiments/claude_aem_context.md.
+    panel.aem({
+      block: 'Interactive Asset',
+      variants: ['dark-base-theme'],
+      rows: [['name', 'SolutionsFX']]
+    });
     panel.hint('T hides and shows this panel · double-click a row to reset it');
     panel.mount();
     T.hotkey(panel, 't');
