@@ -43,6 +43,9 @@
   border: 0;
   border-radius: 50%;
   background: transparent;
+  /* none until the first frame places it: without this a marker that has not
+     been drawn yet sits clickable in the top-left corner of the viewport. */
+  display: none;
   pointer-events: auto;
   cursor: pointer;
   transform: translate(-50%, -50%);

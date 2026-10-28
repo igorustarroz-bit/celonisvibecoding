@@ -39,6 +39,9 @@
         ["rippleFlat", "How flat (x marker height)", 0.05, 1, 0.05],
         ["rippleOpacity", "Opacity", 0, 1, 0.05]
       ]],
+      ["Destinations", [
+        ["cityCount", "How many cities (1 = one flight round the world)", [1, 2, 3, 4]]
+      ]],
       ["Flight arcs", [
         ["arcs", "Draw the arcs", [0, 1]],
         ["arcCount", "How many flights (4 = one in + one out)", 0, 6, 1],

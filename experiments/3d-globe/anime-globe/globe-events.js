@@ -40,6 +40,10 @@
     rippleScale: 3.6,       // how far it grows, as a multiple of the marker radius
     rippleFlat: 0.25,       // its height, as a fraction of the marker's
     rippleOpacity: 0.45,
+    // ---- how many destinations are live (the rest of the list stays in the
+    // file, just not drawn). With ONE city there is no pair to fly between, so
+    // the single flight circles the world and comes home.
+    cityCount: 4,
     // ---- flight arcs between the cities
     arcs: 1,
     // How many flights. The list is ordered ring-first, so with four cities
@@ -190,6 +194,10 @@
     return [a[0] * k0 + b[0] * k1, a[1] * k0 + b[1] * k1, a[2] * k0 + b[2] * k1];
   }
 
+  function cross(a, b) {
+    return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  }
+
   function rgb(hex) {
     var h = (hex || '').replace('#', '');
     if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
@@ -330,37 +338,66 @@
     return [c.tx, c.ty];
   }
 
-  // Ordered ring first: with four cities, the first four pairs give every
-  // destination exactly one flight in and one out. Then the diagonals.
-  // arcCount takes the first N — that is the "more or less flights" handle.
-  function arcPairs() {
-    var n = markers.length, out = [], i, j;
-    for (i = 0; i < n; i++) out.push([i, (i + 1) % n]);
+  function activeMarkers() {
+    var n = Math.max(1, Math.min(markers.length, Math.round(GE.cityCount)));
+    return markers.slice(0, n);
+  }
+
+  // The routes to fly. With two or more destinations the pair list is ordered
+  // ring-first — with four cities the first four pairs give every destination
+  // exactly one flight in and one out — and arcCount takes the first N: that is
+  // the "more or less flights" handle. With a SINGLE destination there is no
+  // pair at all, so the one flight is a great circle through the city: it
+  // leaves heading east, goes round the world and comes home.
+  function arcRoutes() {
+    var act = activeMarkers(), n = act.length, out = [], i, j;
+    if (n === 1) {
+      var A = act[0].p;
+      var e = cross([0, 1, 0], A);                 // east tangent at the city
+      var le = Math.hypot(e[0], e[1], e[2]);
+      if (le < 1e-6) { e = [1, 0, 0]; le = 1; }    // the city sits on the pole
+      out.push({ loop: true, a: A, e: [e[0] / le, e[1] / le, e[2] / le], omega: Math.PI });
+      return out;
+    }
+    var pairs = [];
+    for (i = 0; i < n; i++) pairs.push([i, (i + 1) % n]);
     for (i = 0; i < n; i++) {
       for (j = i + 2; j < n; j++) {
-        if (i === 0 && j === n - 1) continue;    // that one is already the ring's last leg
-        out.push([i, j]);
+        if (i === 0 && j === n - 1) continue;      // already the ring's last leg
+        pairs.push([i, j]);
       }
     }
-    return out.slice(0, Math.max(0, Math.round(GE.arcCount)));
+    if (n === 2) pairs.length = 1;                 // the ring would draw it twice
+    pairs = pairs.slice(0, Math.max(0, Math.round(GE.arcCount)));
+    for (i = 0; i < pairs.length; i++) {
+      var a = act[pairs[i][0]].p, b = act[pairs[i][1]].p;
+      var dot = Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2]));
+      var om = Math.acos(dot);
+      out.push({ a: a, b: b, omega: om, sinw: Math.sin(om) });
+    }
+    return out;
   }
 
   function drawArcs(g, m3, R, cx, cy, yOff, size, alpha, t) {
-    var pairs = arcPairs();
+    var routes = arcRoutes();
     var c1 = rgb(GE.arcColor), c2 = rgb(GE.arcColor2);
     var lw = Math.max(1, size * GE.arcWidthRatio);
     var N = Math.max(16, Math.round(GE.arcSamples));
 
-    for (var k = 0; k < pairs.length; k++) {
-      var A = markers[pairs[k][0]].p, B = markers[pairs[k][1]].p;
-      var dot = Math.max(-1, Math.min(1, A[0] * B[0] + A[1] * B[1] + A[2] * B[2]));
-      var omega = Math.acos(dot), sinw = Math.sin(omega);
-      var lift = GE.arcAltitude * (omega / Math.PI);
+    for (var k = 0; k < routes.length; k++) {
+      var rt = routes[k];
+      var lift = GE.arcAltitude * (rt.omega / Math.PI);
 
       var pts = [], vis = [], i;
       for (i = 0; i <= N; i++) {
         var u = i / N;
-        var s = slerp(A, B, u, omega, sinw);
+        var s;
+        if (rt.loop) {                            // round the world and home
+          var th = u * 2 * Math.PI, ct2 = Math.cos(th), st2 = Math.sin(th);
+          s = [rt.a[0] * ct2 + rt.e[0] * st2, rt.a[1] * ct2 + rt.e[1] * st2, rt.a[2] * ct2 + rt.e[2] * st2];
+        } else {
+          s = slerp(rt.a, rt.b, u, rt.omega, rt.sinw);
+        }
         var r = 1 + lift * Math.sin(Math.PI * u);
         var v = rot(m3, s);
         pts.push([cx + v[0] * r * R, cy - v[1] * r * R + yOff]);
@@ -390,7 +427,7 @@
       if (!GE.flights) continue;
       // The flight. With arcPersist 0 this tail is the only thing that ever
       // draws the arc: it paints it on the way and it is gone behind the head.
-      var ph = ((t / GE.flightMs) + k / pairs.length) % 1;
+      var ph = ((t / GE.flightMs) + k / routes.length) % 1;
       var head = Math.round(ph * N);
       var span = Math.max(1, Math.round(GE.flightTrail * N));
       var tail = head - span;
@@ -523,8 +560,14 @@
     if (alpha <= 0.02) { markers.forEach(hide); return; }
     if (GE.arcs) drawArcs(sctx, m3, R, c, c, yOff, size, alpha, t);
 
+    var live = activeMarkers().length;
     for (var i = 0; i < markers.length; i++) {
       var mk = markers[i];
+      if (i >= live) {                             // switched off with cityCount
+        hide(mk);
+        if (openId === mk.ev.id) closeCard();
+        continue;
+      }
       var v = rot(m3, mk.p);
       var op = v[2] > 0.02 ? Math.min(1, (v[2] - 0.02) / fade) * alpha : 0;
       if (op < 0.02) {
