@@ -44,7 +44,7 @@
       ]],
       ["Flight arcs", [
         ["arcs", "Draw the arcs", [0, 1]],
-        ["arcCount", "How many flights (4 = one in + one out)", 0, 6, 1],
+        ["arcCount", "How many flights (4 = one in + one out)", 0, 20, 1],
         ["arcAltitude", "Arc height (hugs the globe)", 0.005, 0.5, 0.005],
         ["arcWidthRatio", "Stroke width (x buffer)", 0.0004, 0.004, 0.0001],
         ["arcPersist", "Keep the line on screen (0 = only the tail draws it)", [0, 1]],
@@ -55,9 +55,10 @@
       ]],
       ["Flights", [
         ["flights", "Comet along the arc", [0, 1]],
-        ["flightMs", "Lap time (ms)", 1500, 15000, 100],
-        ["flightTrail", "Tail length (it IS the arc)", 0.02, 0.9, 0.01],
-        ["flightSize", "Head size (x stroke)", 0.5, 6, 0.1]
+        ["flightMs", "Time for a half-world hop (ms)", 1000, 20000, 100],
+        ["@pct", "Tail length (% of the trip)", "flightTrail", 2, 90, 1],
+        ["flightSize", "Head size (x stroke)", 0, 6, 0.1],
+        ["flightGlow", "Glow", 0, 3, 0.1]
       ]],
       ["Card", [
         ["cardOffsetPx", "Gap from the marker (px)", 0, 80, 1],
@@ -80,6 +81,11 @@
       group[1].forEach(function (item) {
         var key = item[0], label = item[1];
         if (key === "@colour") panel.colour(label, item[2]);
+        else if (key === "@pct") panel.slider(label, item[2], item[3], item[4], item[5], {
+          fmt: function (v) { return v.toFixed(0) + " %"; },
+          read: function (v) { return v * 100; },     // stored 0..1 -> shown 0..100
+          write: function (o) { return o / 100; }
+        });
         else if (Array.isArray(item[2])) panel.choice(label, key, item[2]);
         else panel.slider(label, key, item[2], item[3], item[4]);
       });

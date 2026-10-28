@@ -46,9 +46,11 @@
     cityCount: 4,
     // ---- flight arcs between the cities
     arcs: 1,
-    // How many flights. The list is ordered ring-first, so with four cities
-    // arcCount 4 gives every destination exactly one flight in and one out;
-    // 5 and 6 add the diagonals, below 4 it opens into a chain.
+    // How many flights are in the air. The corridors are ordered ring-first and
+    // the flights cycle through them, so with four cities arcCount 4 still
+    // gives every destination exactly one flight in and one out; 5 and 6 add
+    // the diagonals and anything above that puts several flights on the same
+    // corridor, evenly spaced in time. Up to 20.
     arcCount: 4,
     arcAltitude: 0.075,     // peak height: fraction of the angular distance, x R.
                             // The flights hug the globe; much above ~0.09 and they
@@ -64,10 +66,14 @@
     arcSamples: 72,
     // ---- the "flight" travelling along each arc
     flights: 1,
+    // Every flight moves at the SAME speed over the surface, whatever the
+    // length of its arc: flightMs is the time for a half-world hop (omega = pi)
+    // and each corridor's period is scaled by its own angular distance.
     flightMs: 5200,
-    flightTrail: 0.34,      // length of the comet tail, as a fraction of the arc
-                            // (long, because with arcPersist 0 the tail IS the arc)
+    flightTrail: 0.34,      // tail length as a FRACTION OF THE TRIP (the tuner
+                            // shows it as a %); with arcPersist 0 the tail IS the arc
     flightSize: 1.4,        // head size, as a multiple of the arc stroke width
+    flightGlow: 1,          // halo around the tail and the head (0 = none)
     // ---- card
     cardOffsetPx: 20,       // gap between the marker and the card edge
     cardBorder: 1,          // 0 = pure Figma black card with no hairline
@@ -368,7 +374,7 @@
       }
     }
     if (n === 2) pairs.length = 1;                 // the ring would draw it twice
-    pairs = pairs.slice(0, Math.max(0, Math.round(GE.arcCount)));
+    // The full corridor list; drawArcs decides how many of them carry a flight.
     for (i = 0; i < pairs.length; i++) {
       var a = act[pairs[i][0]].p, b = act[pairs[i][1]].p;
       var dot = Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2]));
@@ -379,33 +385,40 @@
   }
 
   function drawArcs(g, m3, R, cx, cy, yOff, size, alpha, t) {
-    var routes = arcRoutes();
+    var geoms = arcRoutes();
+    if (!geoms.length) return;
     var c1 = rgb(GE.arcColor), c2 = rgb(GE.arcColor2);
     var lw = Math.max(1, size * GE.arcWidthRatio);
     var N = Math.max(16, Math.round(GE.arcSamples));
+    var count = Math.max(0, Math.round(GE.arcCount));
+    // Only the corridors that actually carry a flight exist. With four cities
+    // and arcCount 4 that is the ring — one flight in and one out of each.
+    var used = count >= geoms.length ? geoms.length : Math.max(1, count);
+    geoms = geoms.slice(0, used);
+    var i, k;
 
-    for (var k = 0; k < routes.length; k++) {
-      var rt = routes[k];
+    g.lineCap = 'round';
+    g.lineJoin = 'round';
+
+    for (k = 0; k < geoms.length; k++) {         // project each corridor once
+      var rt = geoms[k];
       var lift = GE.arcAltitude * (rt.omega / Math.PI);
-
-      var pts = [], vis = [], i;
+      var pts = [], vis = [];
       for (i = 0; i <= N; i++) {
-        var u = i / N;
-        var s;
+        var u = i / N, sp;
         if (rt.loop) {                            // round the world and home
           var th = u * 2 * Math.PI, ct2 = Math.cos(th), st2 = Math.sin(th);
-          s = [rt.a[0] * ct2 + rt.e[0] * st2, rt.a[1] * ct2 + rt.e[1] * st2, rt.a[2] * ct2 + rt.e[2] * st2];
+          sp = [rt.a[0] * ct2 + rt.e[0] * st2, rt.a[1] * ct2 + rt.e[1] * st2, rt.a[2] * ct2 + rt.e[2] * st2];
         } else {
-          s = slerp(rt.a, rt.b, u, rt.omega, rt.sinw);
+          sp = slerp(rt.a, rt.b, u, rt.omega, rt.sinw);
         }
         var r = 1 + lift * Math.sin(Math.PI * u);
-        var v = rot(m3, s);
+        var v = rot(m3, sp);
         pts.push([cx + v[0] * r * R, cy - v[1] * r * R + yOff]);
         vis.push(!occluded([v[0] * r, v[1] * r, v[2]]));
       }
-
-      g.lineCap = 'round';
-      g.lineJoin = 'round';
+      rt.pts = pts;
+      rt.vis = vis;
 
       if (GE.arcPersist) {                        // the steady line, off by default
         var grad = g.createLinearGradient(pts[0][0], pts[0][1], pts[N][0], pts[N][1]);
@@ -414,7 +427,7 @@
         grad.addColorStop(1, rgba(c1, GE.arcOpacity * alpha));
         g.strokeStyle = grad;
         g.lineWidth = lw;
-        var open = false;                         // stroke each visible run
+        var open = false;
         g.beginPath();
         for (i = 0; i <= N; i++) {
           if (!vis[i]) { open = false; continue; }
@@ -423,30 +436,55 @@
         }
         g.stroke();
       }
+    }
 
-      if (!GE.flights) continue;
-      // The flight. With arcPersist 0 this tail is the only thing that ever
-      // draws the arc: it paints it on the way and it is gone behind the head.
-      var ph = ((t / GE.flightMs) + k / routes.length) % 1;
+    if (!GE.flights) return;
+
+    // The flights. With arcPersist 0 the tail is the only thing that ever draws
+    // the arc: it paints it on the way and it is gone behind the head.
+    for (var f = 0; f < count; f++) {
+      var rr = geoms[f % geoms.length];
+      // constant speed over the surface: a short hop takes proportionally less
+      var period = Math.max(200, GE.flightMs * Math.max(0.06, rr.omega / Math.PI));
+      var ph = ((t / period) + (f / count)) % 1;
       var head = Math.round(ph * N);
       var span = Math.max(1, Math.round(GE.flightTrail * N));
       var tail = head - span;
-      for (i = Math.max(0, tail); i < head; i++) {
-        if (!vis[i] || !vis[i + 1]) continue;
-        var f = (i - tail) / span;                // 0 at the end of the tail, 1 at the head
-        var aT = Math.min(1, 0.95 * f * f * f * alpha);
-        if (aT <= 0.004) continue;
-        g.strokeStyle = rgba(c2, aT);
-        g.lineWidth = lw * (0.45 + 0.75 * f);     // the tail tapers into nothing
-        g.beginPath();
-        g.moveTo(pts[i][0], pts[i][1]);
-        g.lineTo(pts[i + 1][0], pts[i + 1][1]);
-        g.stroke();
+      var pt = rr.pts, vs = rr.vis;
+
+      for (var pass = (GE.flightGlow > 0 ? 0 : 1); pass < 2; pass++) {
+        for (i = Math.max(0, tail); i < head; i++) {
+          if (!vs[i] || !vs[i + 1]) continue;
+          var fr = (i - tail) / span;             // 0 at the end of the tail, 1 at the head
+          var aT = pass === 0
+            ? Math.min(1, 0.22 * GE.flightGlow * fr * fr * alpha)
+            : Math.min(1, 0.95 * fr * fr * fr * alpha);
+          if (aT <= 0.004) continue;
+          g.strokeStyle = rgba(c2, aT);
+          g.lineWidth = pass === 0
+            ? lw * (2.2 + 3.4 * fr) * Math.min(2, GE.flightGlow)
+            : lw * (0.45 + 0.75 * fr);            // the tail tapers into nothing
+          g.beginPath();
+          g.moveTo(pt[i][0], pt[i][1]);
+          g.lineTo(pt[i + 1][0], pt[i + 1][1]);
+          g.stroke();
+        }
       }
-      if (vis[head] && GE.flightSize > 0) {
+
+      if (vs[head] && GE.flightSize > 0) {
+        if (GE.flightGlow > 0) {
+          var hr = lw * GE.flightSize * (2.6 + 1.6 * GE.flightGlow);
+          var hg = g.createRadialGradient(pt[head][0], pt[head][1], 0, pt[head][0], pt[head][1], hr);
+          hg.addColorStop(0, rgba(c2, Math.min(1, 0.5 * GE.flightGlow * alpha)));
+          hg.addColorStop(1, rgba(c2, 0));
+          g.fillStyle = hg;
+          g.beginPath();
+          g.arc(pt[head][0], pt[head][1], hr, 0, 2 * Math.PI);
+          g.fill();
+        }
         g.fillStyle = rgba(c2, 0.9 * alpha);
         g.beginPath();
-        g.arc(pts[head][0], pts[head][1], lw * GE.flightSize, 0, 2 * Math.PI);
+        g.arc(pt[head][0], pt[head][1], lw * GE.flightSize, 0, 2 * Math.PI);
         g.fill();
       }
     }
