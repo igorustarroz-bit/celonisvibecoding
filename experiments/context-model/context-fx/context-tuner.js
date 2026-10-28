@@ -225,6 +225,13 @@
     // Igor's rule: every panel says what the antialias is REALLY doing.
     panel.readout(function () { return C.readout(); });
     panel.actions();
+    // Last section: the authored AEM block for this experiment, built from the
+    // knobs above. One source of truth — see experiments/claude_aem_context.md.
+    panel.aem({
+      block: 'Interactive Asset',
+      variants: ['dark-base-theme', 'full-bleed'],
+      rows: [['name', 'ContextModel']]
+    });
     panel.hint();
     panel.mount();
     window.TunerUI.hotkey(panel, "t");

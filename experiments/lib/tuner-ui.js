@@ -543,6 +543,143 @@
     return this;
   };
 
+  /* =======================================================================
+     AEM block (2026-10-28)
+
+     The last section of every panel. The client's site runs on AEM Edge
+     Delivery, where a module is authored as a table of label / value rows and
+     the block reads its settings from that table and nothing else — see
+     experiments/claude_aem_context.md. So the panel that already knows every
+     knob is the natural place to hand that table over.
+
+     spec = {
+       block:    'Interactive Asset',        // the block's name in their library
+       variants: ['dark-base-theme'],        // classes, written in parentheses
+       rows:     [['name', 'ContextModel']], // the rows the block always carries
+       include:  'changed'                   // 'changed' (default) also emits every
+                                             // knob that differs from its default;
+                                             // 'declared' emits only `rows`.
+     }
+
+     Two copies, because the two readers are different people:
+       * as a table — tab separated, so it pastes into the authoring document
+         as a real table, which is how an author writes a block;
+       * as HTML — the decorated shape EDS produces, for whoever wires it up.
+
+     Rule 12: built from <div>s and a <pre>, no data-entry element anywhere.
+     ======================================================================= */
+  Panel.prototype.aem = function (spec) {
+    var self = this;
+    var cfg = spec || {};
+    var declared = cfg.rows || [];
+    var variants = cfg.variants || [];
+    var onlyDeclared = cfg.include === 'declared';
+
+    this.section('AEM block');
+    this.body.appendChild(el('div', 'tu-hint',
+      'The authored rows for ' + (cfg.block || 'this block') +
+      (onlyDeclared ? '.' : ', plus every knob you have moved.') +
+      ' Copy as a table to paste into the document, or as HTML to wire it up.'));
+
+    var wrap = el('div', 'tu-actions');
+    var asTable = el('button', 'tu-btn tu-primary', 'Copy as table');
+    var asHtml = el('button', 'tu-btn', 'Copy as HTML');
+    asTable.type = 'button';
+    asHtml.type = 'button';
+    wrap.appendChild(asTable);
+    wrap.appendChild(asHtml);
+    this.body.appendChild(wrap);
+
+    var status = el('div', 'tu-status');
+    this.body.appendChild(status);
+    var dump = null;
+
+    /* The rows as they stand right now: what the block declares, then whatever
+       the panel says has moved away from its defaults. A path wins over a
+       declared row of the same name, so a knob you tuned replaces its seed. */
+    function rows() {
+      var out = declared.map(function (r) { return [String(r[0]), String(r[1])]; });
+      if (onlyDeclared) return out;
+      self.changedPaths().forEach(function (path) {
+        var key = path.split('.').pop();
+        var value = authored(getPath(self.target, path));
+        var at = -1;
+        out.forEach(function (r, i) { if (r[0] === key) at = i; });
+        if (at >= 0) out[at] = [key, value]; else out.push([key, value]);
+      });
+      return out;
+    }
+
+    function title() {
+      return (cfg.block || 'Block') + (variants.length ? ' (' + variants.join(', ') + ')' : '');
+    }
+
+    /* An authored cell is text, so a number is written the shortest way that
+       still parses back to the same value: 0.72, never fmt()'s padded 0.720. */
+    function authored(v) {
+      if (typeof v === 'number') return String(Number(v.toFixed(6)));
+      if (typeof v === 'boolean') return v ? 'on' : 'off';
+      return String(v);
+    }
+
+    function asTableText() {
+      return [title()].concat(rows().map(function (r) { return r[0] + '\t' + r[1]; })).join('\n');
+    }
+
+    function slug(s) {
+      return String(s).trim().toLowerCase().replace(/[^0-9a-z]+/g, '-').replace(/^-|-$/g, '');
+    }
+
+    function asHtmlText() {
+      var classes = [slug(cfg.block || 'block')].concat(variants).join(' ');
+      return '<div class="' + classes + '" data-block-name="' + slug(cfg.block || 'block') + '">\n' +
+        rows().map(function (r) {
+          return '  <div><div>' + r[0] + '</div><div>' + r[1] + '</div></div>';
+        }).join('\n') + '\n</div>';
+    }
+
+    function showDump(txt) {
+      if (!dump) { dump = el('pre', 'tu-dump'); self.body.appendChild(dump); }
+      dump.textContent = txt;
+      var sel = global.getSelection && global.getSelection();
+      if (!sel) return;
+      var range = document.createRange();
+      range.selectNodeContents(dump);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+
+    function copy(button, label, text) {
+      var txt = text();
+      var n = rows().length;
+      console.log(txt);
+      showDump(txt);
+      function done(ok) {
+        button.textContent = ok ? 'Copied' : 'Select & copy ↓';
+        status.textContent = (ok ? 'Copied ' : 'Not copied — the text below is selected · ') +
+          n + ' row' + (n === 1 ? '' : 's') + ' · ' + title();
+        setTimeout(function () { button.textContent = label; }, 1600);
+      }
+      function legacy() {
+        try { return document.execCommand('copy'); } catch (e) { return false; }
+      }
+      if (global.navigator && navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(txt).then(function () { done(true); }, function () { done(legacy()); });
+      } else done(legacy());
+    }
+
+    asTable.addEventListener('click', function () { copy(asTable, 'Copy as table', asTableText); });
+    asHtml.addEventListener('click', function () { copy(asHtml, 'Copy as HTML', asHtmlText); });
+
+    /* So the library page and anything else can read the same thing without
+       opening the panel. One source of truth per experiment: this spec. */
+    this.aemSpec = {
+      block: cfg.block, variants: variants,
+      rows: rows, table: asTableText, html: asHtmlText
+    };
+    return this;
+  };
+
   Panel.prototype.hint = function (text) {
     this.body.appendChild(el('div', 'tu-hint', text ||
       'Double-click a row to reset that knob — amber means it differs from the default. ' +

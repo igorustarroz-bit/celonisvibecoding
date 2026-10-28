@@ -88,6 +88,13 @@
     p.slider('bloom threshold', 'bloom.threshold', 0, 1, 0.01);
 
     p.actions();
+    // Last section: the authored AEM block for this experiment, built from the
+    // knobs above. One source of truth — see experiments/claude_aem_context.md.
+    p.aem({
+      block: 'Interactive Asset',
+      variants: ['dark-base-theme', 'full-bleed'],
+      rows: [['name', 'DataCore']]
+    });
     p.hint();
     p.mount();
     window.TunerUI.hotkey(p, 't');

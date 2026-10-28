@@ -252,3 +252,34 @@ The first instance that asks for a tuner takes it; later ones render without one
 
 Still to check on the published URL, as every experiment must be: same-origin resources and
 the mobile sweep with a `?nocache=` query string.
+
+## 8. The AEM box, in every tuner (2026-10-28)
+
+Igor's call: rather than a separate page to copy blocks from, the block **is the last
+section of the experiment's own tuner panel**. `panel.aem(spec)` is part of the shared kit —
+the API is documented in `claude_tunerui_context.md`.
+
+Why there: the panel already holds every knob and knows which ones moved, so the table it
+emits is the state you are looking at, not a snapshot someone has to keep in step. Tune on
+the page, hit **Copy as table**, paste into the authoring document. The experiment stops
+being a demo and becomes the authoring tool for its own block.
+
+All six tuners now declare one, each with its own asset name (`ContextModel`, `DataCore`,
+`Book3D`, `CelosphereSeal`, `GlobeEvents`, `SolutionsFX`) and all of them under
+`block: 'Interactive Asset'` — the proposal of §3.1, applied across the board. Experiment 1
+has no tuner; it maps to their own `M64 - Video Scroll` block rather than to an asset, and
+is the one to express against their option names when we get to it.
+
+`panel.aemSpec` gives the same rows to code, which is what the block library page will read
+when we build it: one source of truth per experiment, declared beside the knobs.
+
+Versions bumped with this change: `tuner-ui.js` 4, `context-core.js` 8, `context.css` 3,
+`context-tuner.js` 6, `datacore-tuner.js` 29, `book-tuner.js` 7, `seal-tuner.js` 21,
+`globe-events-tuner.js` 15, `solutions-tuner.js` 20.
+
+### Still to do
+
+- Open each experiment page in a browser and confirm its AEM section renders and copies —
+  only the Context Model one has been driven end to end so far.
+- The published-URL audit (same-origin resources, the 390 px sweep, zero form elements) over
+  every page, since every page's tuner changed.

@@ -39,14 +39,14 @@
   const HERE = new URL(".", document.currentScript.src);
   const url = function (rel) { return new URL(rel, HERE).href; };
 
-  const SCENE_CSS = [url("../../context-model/context-fx/context.css?v=2"), url("../../lib/tuner-ui.css?v=1")];
+  const SCENE_CSS = [url("../../context-model/context-fx/context.css?v=3"), url("../../lib/tuner-ui.css?v=1")];
   const SCENE_JS = [
     url("../../lib/three.min.js?v=14"),
     url("../../lib/tilt-parallax.js?v=1"),
-    url("../../lib/tuner-ui.js?v=2"),
-    url("../../context-model/context-fx/context-core.js?v=7"),
+    url("../../lib/tuner-ui.js?v=4"),
+    url("../../context-model/context-fx/context-core.js?v=8"),
   ];
-  const TUNER_JS = url("../../context-model/context-fx/context-tuner.js?v=5");
+  const TUNER_JS = url("../../context-model/context-fx/context-tuner.js?v=6");
 
   /* The tuner reads window.CONTEXT, and there is only one of those. The first
      instance that asks for a tuner gets it; later ones render without one. */
