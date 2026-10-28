@@ -277,9 +277,38 @@ Versions bumped with this change: `tuner-ui.js` 4, `context-core.js` 8, `context
 `context-tuner.js` 6, `datacore-tuner.js` 29, `book-tuner.js` 7, `seal-tuner.js` 21,
 `globe-events-tuner.js` 15, `solutions-tuner.js` 20.
 
+### Verified and published (2026-10-28)
+
+All six tuners driven in a browser. The five that are not Context Model were checked on a
+harness page — the tuner plus `tuner-ui.js` plus a stub of the effect's global — because
+their real pages carry the whole saved client copy. Each one: the panel mounts, **AEM block**
+is the last section, "Copy as table" emits the title line with its variants and the declared
+row, and 0 form elements with the panel open.
+
+| harness | rows | emitted |
+| --- | --- | --- |
+| globe events | 52 | `Interactive Asset (full-width)` / `GlobeEvents` |
+| datacore | 29 | `Interactive Asset (dark-base-theme, full-bleed)` / `DataCore` |
+| 3d book | 29 | `Interactive Asset (dark-base-theme)` / `Book3D` |
+| celosphere | 59 | `Interactive Asset (dark-base-theme)` / `CelosphereSeal` |
+| solutions, home | 44 | `Interactive Asset (dark-base-theme)` / `SolutionsFX` |
+| solutions, supply-chain | 53 | `Interactive Asset (dark-base-theme)` / `SolutionsFX` |
+
+Two harness gaps that are worth knowing for the next one: `globe-events-tuner.js` reads
+`G.events`, and `solutions-tuner.js` returns early unless `<html data-sfx-page>` is set. Both
+are preconditions of the tuner, not of the AEM section.
+
+`python3 experiments/defuse-inputs.py --report` clean over all 45 tracked HTML files.
+
+**Merged into `main` and published.** Checked on the live URL with a `?nocache=` query
+string (`experiments/3d-globe/index.html`): `tuner-ui.js?v=4` served, **AEM block** is the
+last section, "Copy as table" emits `Interactive Asset (full-width)` / `GlobeEvents`, 0 form
+elements and every resource same-origin.
+
+The safety net stays: tag `before-aem` at `dfeb2a2`, branch `before-aem-main`.
+
 ### Still to do
 
-- Open each experiment page in a browser and confirm its AEM section renders and copies —
-  only the Context Model one has been driven end to end so far.
-- The published-URL audit (same-origin resources, the 390 px sweep, zero form elements) over
-  every page, since every page's tuner changed.
+- The 390 px sweep on the published pages, which this round did not re-run.
+- Experiment 1 against their own `M64 - Video Scroll` option names.
+- The block library page, reading `panel.aemSpec` from each experiment.
