@@ -18,20 +18,37 @@
     if (!G || !window.TunerUI) { setTimeout(start, 200); return; }
 
     var SPEC = [
-      ["Marker", [
-        ["dotSizeRatio", "Dot size (× globe radius)", 0.008, 0.06, 0.001],
-        ["dotMinPx", "Smallest dot (px)", 4, 20, 1],
-        ["dotMaxPx", "Largest dot (px)", 8, 40, 1],
+      ["Marker (flat cylinder)", [
+        ["discRadiusDeg", "Radius on the sphere (deg)", 0.5, 5, 0.1],
+        ["discHeight", "Thickness (x globe radius)", 0.002, 0.06, 0.001],
+        ["discWall", "Side wall darkening", 0, 0.9, 0.02],
+        ["discEdge", "Rim on the top face", 0, 1.5, 0.05],
+        ["discShade", "Shading across the top face", 0, 1, 0.05],
+        ["discGlow", "Glow", 0, 2, 0.05],
         ["hoverGrow", "Grow on hover / open", 1, 2.5, 0.05],
         ["limbFadeZ", "Fade-in depth at the limb", 0.02, 0.6, 0.01]
       ]],
-      ["Pulse", [
-        ["pulse", "Pulsing halo", [0, 1]],
-        ["pulseMs", "Pulse period (ms)", 600, 5000, 100],
-        ["haloScale", "Halo size (× dot)", 1.4, 5, 0.1]
+      ["Ripple", [
+        ["pulse", "Ripple on the surface", [0, 1]],
+        ["pulseMs", "Period (ms)", 600, 6000, 100],
+        ["rippleScale", "Travel (x radius)", 1.4, 6, 0.1]
+      ]],
+      ["Flight arcs", [
+        ["arcs", "Draw the arcs", [0, 1]],
+        ["arcAll", "Every pair (0 = one chain)", [0, 1]],
+        ["arcAltitude", "Arc height", 0.05, 1.2, 0.01],
+        ["arcWidthRatio", "Stroke width (x buffer)", 0.0004, 0.004, 0.0001],
+        ["arcOpacity", "Opacity", 0, 1, 0.02],
+        ["arcSamples", "Samples per arc", 16, 160, 4]
+      ]],
+      ["Flights", [
+        ["flights", "Comet along the arc", [0, 1]],
+        ["flightMs", "Lap time (ms)", 1500, 15000, 100],
+        ["flightTrail", "Tail length", 0.02, 0.5, 0.01],
+        ["flightSize", "Head size (x stroke)", 0.5, 6, 0.1]
       ]],
       ["Card", [
-        ["cardOffsetPx", "Gap from the dot (px)", 0, 80, 1],
+        ["cardOffsetPx", "Gap from the marker (px)", 0, 80, 1],
         ["cardBorder", "Hairline border (0 = pure Figma black)", [0, 1]],
         ["pauseSpin", "Pause the spin while open", [0, 1]]
       ]]
