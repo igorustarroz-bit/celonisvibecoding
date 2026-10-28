@@ -161,6 +161,26 @@ frame again on a 900 px-tall viewport.
 **No white.** `arcColor2` is a light green (`#b7ffae`), and the comet and its
 tail follow it. Nothing on this overlay is white any more.
 
+### Constant speed, and how many flights
+
+**Every flight moves at the same speed over the surface**, whatever the length
+of its arc (Igor, 2026-10-28). `flightMs` is the time for a **half-world hop**
+(ω = π) and each corridor's period is `flightMs · ω/π`, floored at 200 ms. A
+short hop therefore takes proportionally less time instead of crawling.
+Measured: 34.6 °/s on a 15° hop and on a 180° one alike.
+
+**Corridors are projected once per frame, flights cycle over them.** `arcCount`
+is the number of flights in the air, up to 20; flight `f` runs on corridor
+`f % used` with a phase offset of `f / arcCount`, so several flights share a
+corridor evenly spaced in time without re-sampling its 72 points. Only the
+corridors that carry a flight are built (`used = min(arcCount, corridors)`),
+which is what keeps `arcCount 4` meaning exactly the ring — one flight in and
+one out of each city.
+
+The tail is a fraction of the trip; the tuner shows it as a **%** through the
+kit's `read`/`write` options (stored 0–1, shown 0–100). `flightGlow` adds a wide
+faint pass under the tail and a radial halo at the head.
+
 **Occlusion is exact for an orthographic camera**: a point above the sphere is
 hidden only when `z < 0` **and** `x² + y² < 1` — behind the centre plane *and*
 inside the silhouette. Testing `z < 0` alone would chop the arcs where they fly
@@ -263,7 +283,7 @@ Knobs, in five sections: **Marker** (`discRadiusDeg`, `discHeight`, `discWall`,
 `discEdge`, `discShade`, `discGlow`, `hoverGrow`, `limbFadeZ`), **Ripple**
 (`pulse`, `pulseMs`, `rippleScale`), **Flight arcs** (`arcs`, `arcAll`,
 `arcAltitude`, `arcWidthRatio`, `arcOpacity`, `arcSamples`), **Flights**
-(`flights`, `flightMs`, `flightTrail`, `flightSize`) and **Card**
+(`flights`, `flightMs`, `flightTrail` as a %, `flightSize`, `flightGlow`) and **Card**
 (`cardOffsetPx`, `cardBorder`, `pauseSpin`). Both blurs (`blurPx`,
 `discBlurPx`) are knobs, and so are the colours — `discColor`, `arcColor` and
 `arcColor2` use the kit's `colour()` swatch. Plus one action button per city
