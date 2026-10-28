@@ -35,9 +35,12 @@ the experiment index (2026-10-28).
   locally. Never load them from the client's domain.
 
 `index.html` loads, in this order: `../lib/tuner-ui.css?v=1`,
-`anime-globe/globe-events.css?v=1` next to `../lib/poppins.css`, and after
-`scroll-fx.js`: `../lib/tuner-ui.js?v=1`, `globe-events.js?v=1`,
-`globe-events-tuner.js?v=1`. **Bump every `?v=` on any change** — Pages caches
+`anime-globe/globe-events.css` next to `../lib/poppins.css`, and after
+`scroll-fx.js`: `../lib/tuner-ui.js?v=2`, `globe-events.js`,
+`globe-events-tuner.js`. The three `globe-events*` files are bumped **together**
+and are at **`?v=13`** as of 2026-10-28; `tuner-ui.js` went to 2 with the chip
+repaint fix (`claude_tunerui_context.md`), on all seven pages that load it.
+**Bump every `?v=` on any change** — Pages caches
 for ~10 minutes. `original.html` is untouched, as always.
 
 ## 3. Two layers, on purpose
@@ -215,10 +218,12 @@ plus a head) travels along each arc, staggered by arc index.
   viewport (`IntersectionObserver`).
 - Keyboard: each hit area is `role="button" tabindex="0"`, Enter/Space toggles.
 - The hit area is a separate invisible `.ge-hit` circle, `2.2 ×` the cylinder's
-  screen radius with a **24 px floor** — the marker itself is painted on the
-  canvas and a small puck is not a touch target. It is `display: none` in CSS
-  until the first frame places it; without that, a marker that has not been
-  drawn yet sits clickable in the top-left corner of the viewport.
+  screen radius with a **24 px floor**, all of it multiplied by **`hitGrow`**
+  (2 since 2026-10-28, so 48 px at these marker sizes — Igor asked for double).
+  The marker itself is painted on the canvas and a small puck is not a target.
+  The circle is `display: none` in CSS until the first frame places it; without
+  that, a marker that has not been drawn yet sits clickable in the top-left
+  corner of the viewport.
 - Hovering or opening grows the marker by `hoverGrow`; markers on the far side
   are not drawn, and the open card closes itself if its city rotates away (it
   cannot happen while `pauseSpin` is on).
@@ -286,6 +291,16 @@ Three things that cost time here:
    stacked — `badgeGlowLayers` (1–3): a tight bright one, then wider and
    fainter ones over it. `badgeGlowDraw` keeps the halo for the drawing only,
    fading it 60 ms after the last stroke *and its tint* have landed.
+6. **When the halo stays, it breathes.** `badgeGlowPulse` starts a Web
+   Animation on the SVG's `filter` once the drawing and the tint are done,
+   alternating between `badgeGlowCss(1)` and `badgeGlowCss(badgeGlowPulseMin)`
+   forever. Measured between 2.4 px and 5.4 px of blur at the defaults.
+   It is pushed onto `svg.__geAnims`, which `armDraw()` cancels, so reopening
+   the card does not stack animations — checked over three reopens.
+
+The default set Igor settled on: drawn in green (`#5cff50`) over `badgeDrawMs`
+1700 ms, bottom to top, tinting to white over 650 ms, with a 3-strength glow in
+two layers that stays and pulses.
 
 ⚠️ That needs the SVG **inlined in the document** — an `<img>` cannot be
 animated — so the four files are fetched once at boot into `BADGE_SVG`.
@@ -364,21 +379,30 @@ assert r.tagName == 'svg' and r.getAttribute('xmlns') == 'http://www.w3.org/2000
 builds the panel on `lib/tuner-ui.js` (id `ge-tuner`, accent `#5cfe50`, hotkey
 `T`), visible on load and collapsed, like every other experiment.
 
-Knobs, in five sections: **Marker** (`discRadiusDeg`, `discHeight`, `discWall`,
-`discEdge`, `discShade`, `discGlow`, `hoverGrow`, `limbFadeZ`), **Ripple**
-(`pulse`, `pulseMs`, `rippleScale`), **Flight arcs** (`arcs`, `arcAll`,
-`arcAltitude`, `arcWidthRatio`, `arcOpacity`, `arcSamples`), **Flights**
-(`flights`, `flightMs`, `flightTrail` as a %, `flightSize`, `flightGlow`) and **Card**
-(`cardOffsetPx`, `cardBorder`, `pauseSpin`). Both blurs (`blurPx`,
-`discBlurPx`) are knobs, and so are the colours — `discColor`, `arcColor` and
-`arcColor2` use the kit's `colour()` swatch. Plus one action button per city
-(opens that card) and "Close card". 30 rows in all, every path resolving
-against `GLOBE_EVENTS`.
+**52 rows in six sections**, every path resolving against `GLOBE_EVENTS`:
+
+| section | knobs |
+|---|---|
+| Marker (flat cylinder) | `discRadiusDeg` `discHeight` `discWall` `discEdge` `discShade` `discGlow` `blurPx` `discBlurPx` `hoverGrow` `hitGrow` `limbFadeZ` `discColor` |
+| Pulse (ghost cylinder) | `pulse` `pulseMs` `pulseCount` `rippleScale` `rippleFlat` `rippleOpacity` |
+| Destinations | `cityCount` |
+| Flight arcs | `arcs` `arcCount` `arcAltitude` `arcWidthRatio` `arcPersist` `arcOpacity` `arcSamples` `arcColor` `arcColor2` |
+| Flights | `flights` `flightMs` `flightTrail` (shown as a %) `flightSize` `flightGlow` `flightWaitMs` |
+| Card | `cardOffsetPx` `cardGrowMs` `cardStaggerMs` `badgeDraw` `badgeDrawMs` `badgeStroke` `badgeOrder` `badgeDrawColor` `badgeFillColor` `badgeTintMs` `badgeGlow` `badgeGlowLayers` `badgeGlowDraw` `badgeGlowPulse` `badgeGlowPulseMs` `badgeGlowPulseMin` `cardBorder` `pauseSpin` |
+
+Plus one action button per city (opens that card) and "Close card".
+
+The SPEC rows carry two pseudo-keys of their own: `@colour` builds a swatch
+with the kit's `colour()`, and `@pct` is a slider whose `read`/`write` show a
+stored 0–1 as 0–100 %.
+
+⚠️ Clicking a chip used to move the value but leave the highlight on the old
+one — a bug in the shared kit, in every experiment, fixed on 2026-10-28. See
+`claude_tunerui_context.md`: a control has to repaint itself after `_commit`.
 
 This is the **first** panel experiment 2 has ever had. It only reaches the
 markers: `globe.js` still keeps its `CFG` private and exposes no global for it,
-so "a tuner for the globe itself" is still open work (see
-`claude_tunerui_context.md`).
+so "a tuner for the globe itself" is still open work.
 
 ## 11. Verification done before the push
 
@@ -397,6 +421,26 @@ so "a tuner for the globe itself" is still open work (see
   dot and stays inside the viewport, 0 form elements.
 - The only 404s are the client images and fonts that were deliberately not
   staged for the test.
+
+Added as the effect grew (all of it in the cloud container, against a local
+`http.server`, because the built-in browser pane reports `innerWidth` 0):
+
+- Flight speed is constant: 34.6 °/s on a 15° hop and on a 180° one alike.
+- The flights hug the globe: 14 px above the silhouette on a 688 px radius.
+- Every badge decodes in a real browser (`naturalWidth > 0`) — the check that
+  the XML parse missed.
+- The badge draw: stroke and fill never both visible (overlap 0), one constant
+  stroke width, and the three `badgeOrder` modes verified by the *assigned
+  delays* against each shape's bounding box, not by eye.
+- The tint runs transparent → `rgb(102,255,90)` → `rgb(168,255,162)` → white,
+  with no alpha at any point.
+- The glow pulse breathes between 2.4 px and 5.4 px, and three reopens leave
+  exactly one animation on the node.
+- Every chip of every tuner row clicked, asserting the highlight lands on the
+  one clicked and exactly one is lit; the colour channels dragged with a real
+  mouse and the value, the swatch and the read-out all confirmed to follow.
+- `hitGrow` 2 measures exactly double, and a click at 1.4 × the old radius —
+  which used to miss — opens the card.
 
 ## 12. Ideas not done
 
