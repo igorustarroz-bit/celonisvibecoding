@@ -7,8 +7,9 @@
 ## 1. What it is
 
 Four fictional **"Process Intelligence Days"** events pinned to the hero globe.
-Each is a green dot on the sphere; clicking one opens the Celonis Web DS card
-`Card08-City-collab`, anchored next to the dot.
+Each one is a **very flat 3D cylinder** standing on the sphere, the cities are
+laced together by **flight arcs**, and clicking a marker opens the Celonis Web DS
+card `Card08-City-collab`, anchored next to it.
 
 | id | city | lat | lon | date on the card |
 |---|---|---|---|---|
@@ -24,8 +25,10 @@ the experiment index (2026-10-28).
 
 ## 2. Files (in `3d-globe/anime-globe/`)
 
-- `globe-events.js` — settings (`window.GLOBE_EVENTS`), projection, markers, card.
-- `globe-events.css` — everything scoped under `.ge-*`.
+- `globe-events.js` — settings (`window.GLOBE_EVENTS`), projection, the canvas
+  that draws the markers and the arcs, the hit areas and the card.
+- `globe-events.css` — everything scoped under `.ge-*`: it only places the
+  overlay canvas, the invisible hit areas and the card.
 - `globe-events-tuner.js` — the panel, built on `lib/tuner-ui.js`.
 - `badges/badge-<id>.svg` — the four city badges, exported from the Figma
   library **Web DS | Brand Assets** (components `Badges City <City>`), stored
@@ -37,23 +40,33 @@ the experiment index (2026-10-28).
 `globe-events-tuner.js?v=1`. **Bump every `?v=` on any change** — Pages caches
 for ~10 minutes. `original.html` is untouched, as always.
 
-## 3. Why the markers are DOM in a FIXED overlay
+## 3. Two layers, on purpose
 
-They are **not** drawn into the canvas and **not** parented to `p.world`:
+**`.ge-canvas` — the visuals.** A second canvas inserted right after
+`#earth-canvas`, inside `p.world`, `position: absolute; inset: 0`, with the
+**same buffer size** as the globe's (`canvas.width`), so a point computed in the
+globe's internal coordinates lands on the same pixel. It is `pointer-events:
+none`, so the globe keeps its drag, its inertia and its "needle" focus, and it
+deliberately carries **no CSS filter** — `#earth-canvas` has `blur(0.6px)` and
+the markers have to stay sharp.
+`p.world` is given `position: relative` if it is still static; in practice the
+scroll transform already makes it a containing block.
+
+**`.ge-layer` — the interaction.** A `position: fixed; inset: 0; z-index: 5`
+layer appended to `<body>`, holding one invisible `.ge-hit` circle per marker
+(sized from the cylinder's footprint, with a 24 px touch floor) and the card.
+
+Why the card and the hit areas are not inside `p.world`:
 
 - `p.world` carries the scroll transform from `scroll-fx.js`
   (`translate(0,-500px) scale(1)` → `scale(0.25)`). A child would be scaled with
-  it, so the card would shrink while you read it and the dot would stop being a
-  constant size on screen.
-- A fixed overlay (`.ge-layer`, `position: fixed; inset: 0; z-index: 5`) appended
-  to `<body>` sidesteps both, and the dot positions stay correct for free because
-  they are computed from `canvas.getBoundingClientRect()`, which already includes
-  that transform.
+  it, so the card would shrink while you read it.
+- A fixed overlay sidesteps that, and the positions stay correct for free
+  because they are computed from `canvas.getBoundingClientRect()`, which already
+  includes that transform.
 - `z-index: 5` on purpose: the saved header lifts itself to 9 from a child, so
   anything at 9 or above would cover the menu (see `claude_solutions_context.md`
   §22 and the repo-structure note).
-- The layer is `pointer-events: none`; only `.ge-dot` and `.ge-card` take events,
-  so the globe's drag, inertia and "needle" focus all still work.
 
 ## 4. Projection (must stay in step with `globe.js`)
 
@@ -71,31 +84,80 @@ s   = (size/2 + x·R,  size/2 − y·R + state.rise·size·0.10)   // internal p
 css = rect.left + s.x·rect.width/size , rect.top + s.y·rect.height/size
 ```
 
-⚠️ The canvas buffer is **square** (`size = min(max(w,h)·dpr, 1702)`) and is
-stretched to the element box, so x and y need **different** scale factors
-(`rect.width/size` and `rect.height/size`). Using one factor puts the dots off
-the sphere on any non-square hero.
+Everything drawn on `.ge-canvas` stops at the internal coordinates, because that
+canvas shares the globe's buffer. Only the **viewport** positions — the hit areas
+and the card — go through the last line.
 
-Visibility: a dot is hidden below `z = 0.02` (far side) and fades in over
+⚠️ There, the canvas buffer is **square** (`size = min(max(w,h)·dpr, 1702)`) and
+is stretched to the element box, so x and y need **different** scale factors
+(`rect.width/size` and `rect.height/size`). Using one factor puts the hit areas
+off the markers on any non-square hero.
+
+Visibility: a marker is hidden below `z = 0.02` (far side) and fades in over
 `limbFadeZ`, multiplied by `state.alpha` so it respects the entrance animation.
 If the open card's city rotates out of sight the card closes itself — in practice
 it cannot happen while `pauseSpin` is on.
 
-## 5. Interaction (Igor's choices, 2026-10-28)
+## 5. The marker — a flat cylinder, not a dot
+
+Igor, 2026-10-28: the green dots had to become **flat 3D cylinder pieces**.
+
+Drawn in three passes, all from the marker's rotated normal `v` (= its unit
+position in view space):
+
+1. **Glow** — a radial gradient under the marker, itself squashed by `v.z`.
+2. **Ripple** — the old CSS halo, now an expanding ellipse *in the tangent
+   plane*, so it foreshortens with the globe instead of staying a flat circle.
+3. **The cylinder** — bottom centre at `v·R`, top centre at `v·(1+discHeight)·R`.
+
+The geometry that matters: under an orthographic camera the circle of radius `r`
+in the tangent plane projects to an **ellipse** whose minor axis is `r·v.z`,
+along the screen direction of the normal (`atan2(-v.y, v.x)`), and whose major
+axis is `r`. The **silhouette of the cylinder is the convex hull of the bottom
+and top ellipses** — the union of a convex shape and a copy of it offset by the
+extrusion vector *is* their convex hull, so a 20-line monotone chain over 56
+sampled points gives the exact outline. Then: fill the hull with the darkened
+wall colour, fill the top ellipse over it, stroke the rim.
+
+The top face carries a linear gradient along **`globe.js`' own light direction**
+(`[-0.30, 0.62, 0.72]`, normalised, projected to screen). Without it the marker
+reads as a flat circle whenever you look straight down on it — which is exactly
+what the physics says, since the wall only becomes visible towards the limb.
+`discShade` is that knob.
+
+## 6. The flight arcs
+
+Great circles between the cities — every pair (6 arcs) or a single chain
+(`arcAll`). For each one: `slerp` between the two unit vectors, lifted by
+`1 + arcAltitude·(ω/π)·sin(π·t)` so longer hops fly higher, sampled
+`arcSamples` times, rotated by the same matrix and projected.
+
+**Occlusion is exact for an orthographic camera**: a point above the sphere is
+hidden only when `z < 0` **and** `x² + y² < 1` — behind the centre plane *and*
+inside the silhouette. Testing `z < 0` alone would chop the arcs where they fly
+past the limb. The polyline is stroked as visible runs with one gradient per arc
+(`arcColor` → `arcColor2` → `arcColor`), and a comet (a short brightening tail
+plus a head) travels along each arc, staggered by arc index.
+
+## 7. Interaction (Igor's choices, 2026-10-28)
 
 - **Click**, not hover: hover gave false positives while dragging the globe and
   has no meaning on a phone. A pointer move of more than 5 px between
   `pointerdown` and `click` is treated as a drag and does not open the card.
-- The card **follows the dot** rather than sitting in a fixed corner.
+- The card **follows the marker** rather than sitting in a fixed corner.
 - Opening a card **pauses the auto-spin** (`__earth.spinAnim.pause()`) and
   closing resumes it. Knob: `pauseSpin`.
 - Closes on Esc, on a click anywhere outside, and when the hero leaves the
   viewport (`IntersectionObserver`).
-- Keyboard: each dot is `role="button" tabindex="0"`, Enter/Space toggles.
-- The dot is 9–18 px, so it carries an invisible `::before` hit area of
-  `inset: -9px` — a 9 px circle is not a touch target.
+- Keyboard: each hit area is `role="button" tabindex="0"`, Enter/Space toggles.
+- The hit area is a separate invisible `.ge-hit` circle, `2.2 ×` the cylinder's
+  screen radius with a **24 px floor** — the marker itself is painted on the
+  canvas and a small puck is not a touch target.
+- Hovering or opening grows the marker by `hoverGrow`; markers on the far side
+  are not drawn, and the open card closes itself if its city rotates away (it
+  cannot happen while `pauseSpin` is on).
 
-## 6. The card (Figma → CSS)
+## 8. The card (Figma → CSS)
 
 Source: `Web DS | Components`, file `tBZiqZtdfjJXmCflrpjN1U`, frame
 `Card08-City-collab` (`13966:72135`); the per-city variants are
@@ -138,26 +200,32 @@ inside the file). Always re-parse every exported SVG afterwards
 (`python3 -c "import xml.dom.minidom as m; m.parse(f)"`) — one of four was broken
 and still had a plausible file size.
 
-## 7. The tuner panel
+## 9. The tuner panel
 
 `window.GLOBE_EVENTS` is the live settings object; `globe-events-tuner.js`
 builds the panel on `lib/tuner-ui.js` (id `ge-tuner`, accent `#5cfe50`, hotkey
 `T`), visible on load and collapsed, like every other experiment.
 
-Knobs: `dotSizeRatio`, `dotMinPx`, `dotMaxPx`, `hoverGrow`, `limbFadeZ`;
-`pulse`, `pulseMs`, `haloScale`; `cardOffsetPx`, `cardBorder`, `pauseSpin`.
-Plus one action button per city (opens that card) and "Close card".
+Knobs, in five sections: **Marker** (`discRadiusDeg`, `discHeight`, `discWall`,
+`discEdge`, `discShade`, `discGlow`, `hoverGrow`, `limbFadeZ`), **Ripple**
+(`pulse`, `pulseMs`, `rippleScale`), **Flight arcs** (`arcs`, `arcAll`,
+`arcAltitude`, `arcWidthRatio`, `arcOpacity`, `arcSamples`), **Flights**
+(`flights`, `flightMs`, `flightTrail`, `flightSize`) and **Card**
+(`cardOffsetPx`, `cardBorder`, `pauseSpin`). Plus one action button per city
+(opens that card) and "Close card".
 
 This is the **first** panel experiment 2 has ever had. It only reaches the
 markers: `globe.js` still keeps its `CFG` private and exposes no global for it,
 so "a tuner for the globe itself" is still open work (see
 `claude_tunerui_context.md`).
 
-## 8. Verification done before the push
+## 10. Verification done before the push
 
 - `python3 experiments/defuse-inputs.py --report` → clean over all 44 tracked
   HTML files.
-- Playwright at 1440×900 (cloud container, local `http.server`): 4 dots built,
+- Playwright at 1440×900 (cloud container, local `http.server`): the overlay
+  canvas shares the globe's box and buffer to the pixel and is actually painted
+  (~30 k non-transparent pixels), 4 hit areas built,
   `input,select,textarea,form` count 0 with the panel mounted, card opens with
   the right city/date/badge, `state.spin` frozen while open and moving again
   after Esc, no page errors.
@@ -167,9 +235,9 @@ so "a tuner for the globe itself" is still open work (see
 - The only 404s are the client images and fonts that were deliberately not
   staged for the test.
 
-## 9. Ideas not done
+## 11. Ideas not done
 
-- A leader line from the dot to the card.
+- A leader line from the marker to the card.
 - Auto-rotating the globe to bring a city to the front when its card is opened
   from the tuner (today the card just does not show if the city is on the far
   side).
