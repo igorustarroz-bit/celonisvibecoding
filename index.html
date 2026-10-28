@@ -288,6 +288,26 @@
     </div>
   </article>
 
+  <article class="exp">
+    <span class="date">Oct 28, 2026</span>
+    <div class="num">AEM pilot</div>
+    <h2>Context Model, delivered as an Adobe Experience Manager block</h2>
+    <p>Not a new effect &mdash; a new wrapper around experiment 6, so that moving it into the
+       client&rsquo;s system is a line of code rather than a rewrite. Their site runs on AEM Edge
+       Delivery, where a module is authored as a table of <em>label / value</em> rows and a block
+       reads its settings from that table and nothing else. Here their own
+       <code>interactive-asset</code> block is ported line for line, their asset registry with it,
+       and the scene is registered in it as <code>ContextModel</code> &mdash; still loaded from
+       <code>experiments/context-model/</code>, with not one line of the effect changed. The rows
+       under the canvas are what an author would write in the document, and the camera angle and
+       bloom on screen are the values those rows carry. Notes, and the three questions this raises
+       for the client, in <code>experiments/claude_aem_context.md</code>.</p>
+    <div class="links">
+      <a href="experiments/aem-blocks/index.html" target="_blank" rel="noopener">Open the pilot</a>
+      <a class="alt" href="experiments/context-model/index.html" target="_blank" rel="noopener">Experiment 6, as it was</a>
+    </div>
+  </article>
+
 </main>
 <footer>
   <div class="footer-inner">

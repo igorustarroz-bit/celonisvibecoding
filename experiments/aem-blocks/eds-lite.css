@@ -1,0 +1,124 @@
+/* =========================================================================
+   eds-lite.css — the page chrome and the design-token fallbacks.
+
+   Unofficial design prototype. Not an official page of the brand shown, and
+   not published or endorsed by them.
+
+   Two jobs, both temporary:
+
+   1. The `--fnd-*` custom properties the site's block stylesheets read. On the
+      real site these come from its token layer (`/dist/chunks/tokens.js` and
+      `styles.css`). The values here are stand-ins so the ported block renders
+      standalone, and the whole `:root` rule is DELETED on migration. It also
+      doubles as the list of tokens this block actually depends on — four
+      colours, two spacings, one radius and three type ramps.
+
+   2. The section/wrapper layout EDS itself provides around a block.
+   ========================================================================= */
+
+:root {
+  /* DELETE ON MIGRATION — provided by the site's own token layer. */
+  --fnd-color-text-high: #fff;
+  --fnd-color-text-mid: #b9bcc4;
+  --fnd-color-text-low: #80858f;
+  --fnd-color-background-secondary: #15171b;
+  --fnd-color-border-low: #2a2d34;
+  --fnd-spacing-02: 8px;
+  --fnd-spacing-06: 32px;
+  --fnd-radius-m: 4px;
+  --fnd-typography-paragraph-s-font-size: 14px;
+  --fnd-typography-paragraph-s-line-height: 20px;
+  --fnd-typography-paragraph-s-letter-spacing: 0;
+  --fnd-typography-paragraph-m-font-size: 16px;
+  --fnd-typography-paragraph-l-font-size: 18px;
+  --fnd-typography-paragraph-l-line-height: 26px;
+  --fnd-typography-paragraph-l-letter-spacing: 0;
+}
+
+html { scroll-behavior: auto; }
+
+body {
+  margin: 0;
+  background: #0a0b0d;
+  color: var(--fnd-color-text-high);
+  font-family: Poppins, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* EDS section: the content column every block sits in. */
+.section {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.section.full-width { max-width: none; padding: 0; }
+
+.intro { padding: 96px 0 48px; max-width: 760px; }
+
+.intro h1 {
+  margin: 0 0 16px;
+  font-size: clamp(32px, 5vw, 56px);
+  line-height: 1.05;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.intro p {
+  margin: 0 0 12px;
+  color: var(--fnd-color-text-mid);
+  font-size: var(--fnd-typography-paragraph-l-font-size);
+  line-height: var(--fnd-typography-paragraph-l-line-height);
+}
+
+.intro a { color: #ff7a26; }
+
+.authored { padding: 48px 0 96px; }
+
+.authored h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.authored p {
+  margin: 0 0 20px;
+  color: var(--fnd-color-text-mid);
+  font-size: var(--fnd-typography-paragraph-m-font-size);
+}
+
+/* The authored table, shown as the author would write it in the document. */
+.authored table {
+  border-collapse: collapse;
+  width: 100%;
+  max-width: 620px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 13px;
+}
+
+.authored caption {
+  caption-side: top;
+  text-align: left;
+  padding: 10px 14px;
+  background: #ff7a26;
+  color: #15171b;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.authored td {
+  border: 1px solid var(--fnd-color-border-low);
+  padding: 8px 14px;
+  color: var(--fnd-color-text-mid);
+  vertical-align: top;
+}
+
+.authored td:first-child { width: 40%; color: var(--fnd-color-text-high); }
+
+.note {
+  margin-top: 20px;
+  max-width: 620px;
+  color: var(--fnd-color-text-low);
+  font-size: var(--fnd-typography-paragraph-s-font-size);
+  line-height: var(--fnd-typography-paragraph-s-line-height);
+}

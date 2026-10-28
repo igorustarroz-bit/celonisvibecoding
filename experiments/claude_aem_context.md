@@ -174,3 +174,65 @@ m.sourcesContent[0];   // original src/blocks/<name>/<name>.js
 
 Keep the output small (slice it, or filter `m.sources` first) — a whole map is ~700 KB and
 will blow the tool-result limit.
+
+## 7. The pilot — `experiments/aem-blocks/` (2026-10-28)
+
+Experiment 6 placed through the site's own `interactive-asset` block, with **no change to
+the effect**. `context-core.js` is still loaded from `experiments/context-model/context-fx/`
+— never copied — and the pilot is only the wrapper around it.
+
+```
+experiments/aem-blocks/
+  index.html                                  the demo page: block + the authored rows
+  eds-lite.js / .css                          stand-in for the EDS decoration step
+  blocks/interactive-asset/
+    interactive-asset.js                      THEIR block, ported line for line
+    interactive-asset.css                     THEIR stylesheet, re-expanded
+  assets/
+    asset-registry.js                         THEIR registry
+    context-model.js                          ours: the ContextModel asset class
+```
+
+What each piece proves:
+
+- **`eds-lite.js`** turns `[data-block]` into the EDS shape (`<div class="<name>-wrapper">`
+  around `<div class="<name>" data-block-name="<name>">`), loads the block's CSS and JS, and
+  calls its decorator. Its `getOptionsFromBlock()` is a port of theirs, so the option parsing
+  is the real one.
+- **`blocks/interactive-asset/`** is their code. Two deviations, both commented in the file:
+  the module form (a global registration instead of `export default`, because a module cannot
+  be imported from `file://`), and **CHANGE #1** — one line that forwards every authored
+  option to the asset. Theirs forwards only `modalHash` and `videoAnimation`, so an asset can
+  be placed but not configured. That one line is the thing worth proposing upstream.
+- **`assets/context-model.js`** is the deliverable shape: a class whose constructor is
+  `({ target, props })`. It builds the stage, loads the scene in order, then pushes every
+  authored key that exists in `window.CONTEXT.defaults` into the live settings, coerced to the
+  type of that default. Unknown or unparseable keys are logged and ignored rather than
+  silently dropped. **It is a plain class, not a Svelte component, and the block accepts it** —
+  which is the hypothesis in §3.1, now tested at least against our port of their block.
+
+### Known limitations, stated rather than hidden
+
+- `context-core.js` binds to the element ids `context-stage` / `context-sticky` /
+  `context-scroll`, so **one instance per page**. A second one renders a notice. Making the
+  scene instance-scoped is the next change, and it is the same change that would let a block
+  be authored twice on a page.
+- `destroy()` only clears the stage. The scene has no teardown yet; it takes the page for the
+  life of the document.
+- The `--fnd-*` token fallbacks in `eds-lite.css` are stand-ins under a `DELETE ON MIGRATION`
+  comment. The rule itself doubles as the list of tokens their block depends on: four colours,
+  two spacings, one radius, three type ramps.
+
+### Verification (cloud container, Playwright, served over http)
+
+- block decorates: `data-block-status="loaded"`, wrapper present,
+  `data-asset-name="ContextModel"`, registry reports `["ContextModel"]`;
+- authored values reach the scene: `camAz` 34 against a default of 25, `bloomStrength` 0.72;
+- scene runs: WebGL2, MSAA 4, 1440×804 buffer, ~57 fps under SwiftShader, renders correctly
+  mid-scroll;
+- rule 12: `document.querySelectorAll('input,select,textarea,form').length === 0`;
+- tuner panel present and collapsed on load (`tu-panel tu-closed`);
+- `scrollWidth === innerWidth` at six scroll depths, at 1440 px and at 390 px.
+
+Still to check on the published URL, as every experiment must be: same-origin resources and
+the mobile sweep with a `?nocache=` query string.

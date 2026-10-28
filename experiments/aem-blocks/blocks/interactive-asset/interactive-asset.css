@@ -1,0 +1,92 @@
+/* =========================================================================
+   interactive-asset — the site's own stylesheet, ported.
+
+   Unofficial design prototype. Not an official page of the brand shown, and
+   not published or endorsed by them.
+
+   Re-expanded from the site's built `/dist/blocks/interactive-asset/
+   interactive-asset.css`. Selectors and values are theirs and are kept as
+   they are, so a scene sized against this box behaves the same there.
+
+   It depends on their `--fnd-*` design tokens. Fallback values for the ones
+   used here live in ../../eds-lite.css and must be dropped on migration.
+   ========================================================================= */
+
+.interactive-asset-wrapper .interactive-asset {
+  display: flex;
+  flex-direction: column;
+  color: var(--fnd-color-text-high);
+}
+
+.interactive-asset-wrapper .interactive-asset h2 { margin: 0; }
+
+.interactive-asset-wrapper .interactive-asset .interactive-asset-container {
+  position: relative;
+  width: 100%;
+  min-height: 400px;
+}
+
+@media (width >= 1200px) {
+  .interactive-asset-wrapper .interactive-asset .interactive-asset-container {
+    min-height: 600px;
+  }
+}
+
+.interactive-asset-wrapper .interactive-asset .interactive-asset-container:empty::before {
+  content: "Loading interactive content...";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  text-align: center;
+  color: var(--fnd-color-text-mid);
+  font-size: var(--fnd-typography-paragraph-m-font-size);
+}
+
+.interactive-asset-wrapper .interactive-asset .interactive-asset-container > * {
+  animation: fade-in 0.3s ease-in;
+}
+
+.interactive-asset-wrapper .interactive-asset .interactive-asset-error {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+  padding: var(--fnd-spacing-06);
+  background-color: var(--fnd-color-background-secondary);
+  border: 1px solid var(--fnd-color-border-low);
+  border-radius: var(--fnd-radius-m);
+}
+
+.interactive-asset-wrapper .interactive-asset .interactive-asset-error p {
+  margin: 0;
+  text-align: center;
+  color: var(--fnd-color-text-mid);
+  font-size: var(--fnd-typography-paragraph-l-font-size);
+  line-height: var(--fnd-typography-paragraph-l-line-height);
+  letter-spacing: var(--fnd-typography-paragraph-l-letter-spacing);
+}
+
+.interactive-asset-wrapper .interactive-asset .interactive-asset-error .error-details {
+  margin-top: var(--fnd-spacing-02);
+  color: var(--fnd-color-text-low);
+  font-size: var(--fnd-typography-paragraph-s-font-size);
+  line-height: var(--fnd-typography-paragraph-s-line-height);
+  letter-spacing: var(--fnd-typography-paragraph-s-letter-spacing);
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ----------------------------------------------------------------------
+   Ours, not theirs: the Context Model scene is scroll-scrubbed, so it needs
+   the container to be the scene's own height rather than a 400/600 px box.
+   The `full-bleed` variant is written by the author in the block title.
+   ---------------------------------------------------------------------- */
+.interactive-asset-wrapper .interactive-asset.full-bleed .interactive-asset-container {
+  min-height: 0;
+}
