@@ -58,10 +58,13 @@
         ["flightMs", "Time for a half-world hop (ms)", 1000, 20000, 100],
         ["@pct", "Tail length (% of the trip)", "flightTrail", 2, 90, 1],
         ["flightSize", "Head size (x stroke)", 0, 6, 0.1],
-        ["flightGlow", "Glow", 0, 3, 0.1]
+        ["flightGlow", "Glow", 0, 3, 0.1],
+        ["flightWaitMs", "Wait on the ground between laps (ms)", 0, 6000, 50]
       ]],
       ["Card", [
         ["cardOffsetPx", "Gap from the marker (px)", 0, 80, 1],
+        ["cardGrowMs", "Grow out of the marker (ms)", 80, 900, 10],
+        ["cardStaggerMs", "Contents, one after the other (ms)", 0, 300, 5],
         ["cardBorder", "Hairline border (0 = pure Figma black)", [0, 1]],
         ["pauseSpin", "Pause the spin while open", [0, 1]]
       ]]

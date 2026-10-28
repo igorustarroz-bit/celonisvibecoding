@@ -55,7 +55,7 @@
     arcAltitude: 0.075,     // peak height: fraction of the angular distance, x R.
                             // The flights hug the globe; much above ~0.09 and they
                             // arch out of the hero.
-    arcWidthRatio: 0.002,   // stroke width / canvas buffer size
+    arcWidthRatio: 0.0027,  // stroke width / canvas buffer size
     // Stripe's globe does not keep the arc on screen: the line is drawn by the
     // flight's own tail and then it is gone. arcPersist 0 is that; 1 brings the
     // steady line back.
@@ -69,13 +69,19 @@
     // Every flight moves at the SAME speed over the surface, whatever the
     // length of its arc: flightMs is the time for a half-world hop (omega = pi)
     // and each corridor's period is scaled by its own angular distance.
-    flightMs: 5200,
-    flightTrail: 0.34,      // tail length as a FRACTION OF THE TRIP (the tuner
+    flightMs: 8200,
+    flightTrail: 0.8,       // tail length as a FRACTION OF THE TRIP (the tuner
                             // shows it as a %); with arcPersist 0 the tail IS the arc
+    // Two cities can sit very close together, and at constant speed that hop is
+    // over in no time and the flight just blinks. This is the pause on the
+    // ground after each lap, so a short corridor breathes instead of flickering.
+    flightWaitMs: 900,
     flightSize: 1.4,        // head size, as a multiple of the arc stroke width
-    flightGlow: 1,          // halo around the tail and the head (0 = none)
+    flightGlow: 0.3,        // halo around the tail and the head (0 = none)
     // ---- card
     cardOffsetPx: 20,       // gap between the marker and the card edge
+    cardGrowMs: 340,        // the card grows out of the marker you clicked
+    cardStaggerMs: 70,      // then its contents come in, one after the other
     cardBorder: 1,          // 0 = pure Figma black card with no hairline
     pauseSpin: 1,           // 1 = the auto-spin stops while a card is open
     events: [
@@ -445,17 +451,24 @@
     for (var f = 0; f < count; f++) {
       var rr = geoms[f % geoms.length];
       // constant speed over the surface: a short hop takes proportionally less
-      var period = Math.max(200, GE.flightMs * Math.max(0.06, rr.omega / Math.PI));
-      var ph = ((t / period) + (f / count)) % 1;
-      var head = Math.round(ph * N);
-      var span = Math.max(1, Math.round(GE.flightTrail * N));
-      var tail = head - span;
+      var travel = Math.max(200, GE.flightMs * Math.max(0.06, rr.omega / Math.PI));
+      var trail = Math.max(0.01, GE.flightTrail);
+      var active = travel * (1 + trail);        // the tail keeps draining after arrival
+      var cycle = active + Math.max(0, GE.flightWaitMs);
+      var tc = (t + (f / count) * cycle) % cycle;
+      if (tc > active) continue;                // on the ground, waiting its turn
+
+      var q = tc / travel;                      // head progress; 1 = arrived
+      var head = Math.round(Math.min(1, q) * N);
+      var tailQ = q - trail;
+      var tail = Math.round(tailQ * N);
+      var spanN = Math.max(1, trail * N);
       var pt = rr.pts, vs = rr.vis;
 
       for (var pass = (GE.flightGlow > 0 ? 0 : 1); pass < 2; pass++) {
         for (i = Math.max(0, tail); i < head; i++) {
           if (!vs[i] || !vs[i + 1]) continue;
-          var fr = (i - tail) / span;             // 0 at the end of the tail, 1 at the head
+          var fr = (i - tail) / spanN;          // 0 at the end of the tail, 1 at the head
           var aT = pass === 0
             ? Math.min(1, 0.22 * GE.flightGlow * fr * fr * alpha)
             : Math.min(1, 0.95 * fr * fr * fr * alpha);
@@ -463,7 +476,7 @@
           g.strokeStyle = rgba(c2, aT);
           g.lineWidth = pass === 0
             ? lw * (2.2 + 3.4 * fr) * Math.min(2, GE.flightGlow)
-            : lw * (0.45 + 0.75 * fr);            // the tail tapers into nothing
+            : lw * (0.45 + 0.75 * fr);          // the tail tapers into nothing
           g.beginPath();
           g.moveTo(pt[i][0], pt[i][1]);
           g.lineTo(pt[i + 1][0], pt[i + 1][1]);
@@ -471,7 +484,7 @@
         }
       }
 
-      if (vs[head] && GE.flightSize > 0) {
+      if (q <= 1 && vs[head] && GE.flightSize > 0) {   // no head once it has landed
         if (GE.flightGlow > 0) {
           var hr = lw * GE.flightSize * (2.6 + 1.6 * GE.flightGlow);
           var hg = g.createRadialGradient(pt[head][0], pt[head][1], 0, pt[head][0], pt[head][1], hr);
@@ -508,10 +521,25 @@
     cardBadge.src = 'anime-globe/badges/badge-' + m.ev.id + '.svg';
     cardBadge.style.inset = BADGE_INSET[m.ev.id] || '4%';
     card.classList.toggle('no-border', !GE.cardBorder);
+    card.classList.remove('is-open');
+    card.style.setProperty('--ge-grow', GE.cardGrowMs + 'ms');
+    card.style.setProperty('--ge-seq', GE.cardStaggerMs + 'ms');
     card.style.display = 'block';
     spin(false);
-    frame(true);
-    requestAnimationFrame(function () { card.classList.add('is-open'); });
+    frame(true);                                 // places left/top for this marker
+
+    // Grow out of the point that was clicked: the origin is the marker, in the
+    // card's own coordinates. offsetLeft/offsetWidth, not getBoundingClientRect
+    // — the rect would already be shrunk by the scale(0.14) start state.
+    var ox = Math.max(0, Math.min(card.offsetWidth, m.x - card.offsetLeft));
+    var oy = Math.max(0, Math.min(card.offsetHeight, m.y - card.offsetTop));
+    card.style.transformOrigin = ox.toFixed(1) + 'px ' + oy.toFixed(1) + 'px';
+
+    // The forced reflow has already computed the scale(0.14) start state, so
+    // the class can go on right here. Waiting for a rAF cost ~100 ms, because
+    // the callback queues behind the globe's own (heavy) render frame.
+    void card.offsetWidth;
+    card.classList.add('is-open');
   }
 
   function closeCard() {
@@ -565,7 +593,8 @@
     var y = m.y - h / 2;
     if (y + h + pad > vh) y = vh - h - pad;
     if (y < pad) y = pad;
-    card.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)';
+    card.style.left = Math.round(x) + 'px';     // left/top, NOT transform: the
+    card.style.top = Math.round(y) + 'px';      // transform runs the grow-in
   }
 
   function frame(force) {
