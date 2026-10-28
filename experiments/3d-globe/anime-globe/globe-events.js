@@ -32,6 +32,9 @@
     blurPx: 1.9,            // blur of the soft layer (glow, ripple, arcs)
     discBlurPx: 0.6,        // blur of the marker layer (0 = fully sharp)
     hoverGrow: 1.35,        // radius multiplier on hover / while open
+    // The clickable circle is 2.2x the cylinder's screen radius with a 24px
+    // floor, all of it multiplied by this. 2 = Igor's doubled target.
+    hitGrow: 2,
     limbFadeZ: 0.18,        // markers fade in over this view-space z
     // ---- the pulse: an ultra-flat ghost cylinder growing out of the marker
     pulse: 1,
@@ -842,7 +845,7 @@
 
       mk.x = rect.left + top[0] * kx;             // viewport position of the top face
       mk.y = rect.top + top[1] * ky;
-      var hit = Math.max(24, 2.2 * rPx * kx);
+      var hit = Math.max(24, 2.2 * rPx * kx) * Math.max(0.25, GE.hitGrow);
       if (!mk.shown) { mk.el.style.display = 'block'; mk.shown = true; }
       mk.el.style.width = hit.toFixed(1) + 'px';
       mk.el.style.height = hit.toFixed(1) + 'px';

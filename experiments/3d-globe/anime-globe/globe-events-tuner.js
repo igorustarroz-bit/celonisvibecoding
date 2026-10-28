@@ -28,6 +28,7 @@
         ["blurPx", "Blur of the glow / arcs layer (px)", 0, 6, 0.1],
         ["discBlurPx", "Blur of the cylinder itself (px)", 0, 3, 0.1],
         ["hoverGrow", "Grow on hover / open", 1, 2.5, 0.05],
+        ["hitGrow", "Mouse/touch target (x the default)", 0.5, 5, 0.1],
         ["limbFadeZ", "Fade-in depth at the limb", 0.02, 0.6, 0.01],
         ["@colour", "Marker colour", "discColor"]
       ]],
