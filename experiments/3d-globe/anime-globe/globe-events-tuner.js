@@ -31,18 +31,21 @@
         ["limbFadeZ", "Fade-in depth at the limb", 0.02, 0.6, 0.01],
         ["@colour", "Marker colour", "discColor"]
       ]],
-      ["Ripple", [
-        ["pulse", "Ripple on the surface", [0, 1]],
+      ["Pulse (ultra-flat ghost cylinder)", [
+        ["pulse", "Pulse", [0, 1]],
         ["pulseMs", "Period (ms)", 600, 6000, 100],
-        ["rippleScale", "Travel (x radius)", 1.4, 6, 0.1],
-        ["rippleSoft", "Softness (0 = tight ring)", 0.05, 0.95, 0.05]
+        ["pulseCount", "How many at once", [1, 2, 3]],
+        ["rippleScale", "How far it grows (x radius)", 1.4, 8, 0.1],
+        ["rippleFlat", "How flat (x marker height)", 0.05, 1, 0.05],
+        ["rippleOpacity", "Opacity", 0, 1, 0.05]
       ]],
       ["Flight arcs", [
         ["arcs", "Draw the arcs", [0, 1]],
-        ["arcAll", "Every pair (0 = one chain)", [0, 1]],
+        ["arcCount", "How many flights (4 = one in + one out)", 0, 6, 1],
         ["arcAltitude", "Arc height (hugs the globe)", 0.005, 0.5, 0.005],
         ["arcWidthRatio", "Stroke width (x buffer)", 0.0004, 0.004, 0.0001],
-        ["arcOpacity", "Opacity", 0, 1, 0.02],
+        ["arcPersist", "Keep the line on screen (0 = only the tail draws it)", [0, 1]],
+        ["arcOpacity", "Opacity of that steady line", 0, 1, 0.02],
         ["arcSamples", "Samples per arc", 16, 160, 4],
         ["@colour", "Arc colour (ends)", "arcColor"],
         ["@colour", "Arc colour (middle + comet)", "arcColor2"]
@@ -50,7 +53,7 @@
       ["Flights", [
         ["flights", "Comet along the arc", [0, 1]],
         ["flightMs", "Lap time (ms)", 1500, 15000, 100],
-        ["flightTrail", "Tail length", 0.02, 0.5, 0.01],
+        ["flightTrail", "Tail length (it IS the arc)", 0.02, 0.9, 0.01],
         ["flightSize", "Head size (x stroke)", 0.5, 6, 0.1]
       ]],
       ["Card", [

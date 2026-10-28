@@ -17,42 +17,53 @@
 
   var GE = window.GLOBE_EVENTS = {
     // ---- marker: a very flat cylinder standing on the sphere
-    discRadiusDeg: 0.85,    // radius on the sphere, in degrees of arc
-    discHeight: 0.014,      // extrusion along the normal, as a fraction of R
+    // (the numbers below are the set Igor copied out of the tuner, 2026-10-28)
+    discRadiusDeg: 0.7,     // radius on the sphere, in degrees of arc
+    discHeight: 0.009,      // extrusion along the normal, as a fraction of R
     discColor: '#5cfe50',
     discWall: 0.42,         // how much darker the side wall is (0 = same, 1 = black)
-    discEdge: 0,            // rim around the top face (0 = none; it reads as a hard white line)
-    discShade: 0.55,        // light/shadow across the top face (0 = flat colour)
-    discGlow: 0.95,         // soft glow under the marker (0 = none)
+    discEdge: 0,            // rim around the top face (0 = none; it reads as a hard line)
+    discShade: 0.35,        // light/shadow across the top face (0 = flat colour)
+    discGlow: 0.45,         // soft glow under the marker (0 = none)
     // Two layers of blur. Igor asked for everything green to sit softer, but at
-    // half size a single heavy blur turned the cylinder into a blob, so the glow,
+    // this size a single heavy blur turns the cylinder into a blob, so the glow,
     // the ripple and the arcs go on a heavily blurred canvas and the cylinder
     // itself on a nearly sharp one above it.
     blurPx: 1.9,            // blur of the soft layer (glow, ripple, arcs)
-    discBlurPx: 0.4,        // blur of the marker layer (0 = fully sharp)
+    discBlurPx: 0.6,        // blur of the marker layer (0 = fully sharp)
     hoverGrow: 1.35,        // radius multiplier on hover / while open
     limbFadeZ: 0.18,        // markers fade in over this view-space z
-    // ---- ripple on the surface (replaces the old CSS halo)
+    // ---- the pulse: an ultra-flat ghost cylinder growing out of the marker
     pulse: 1,
     pulseMs: 2400,
-    rippleScale: 3.6,       // how far the ripple travels, as a multiple of the radius
-    rippleSoft: 0.45,       // 0 = tight ring, 1 = a wide haze (never a hard ellipse)
+    pulseCount: 1,          // how many are in flight at once, evenly staggered
+    rippleScale: 3.6,       // how far it grows, as a multiple of the marker radius
+    rippleFlat: 0.25,       // its height, as a fraction of the marker's
+    rippleOpacity: 0.45,
     // ---- flight arcs between the cities
     arcs: 1,
-    arcAll: 1,              // 1 = every pair, 0 = a single chain through the cities
-    arcAltitude: 0.055,     // peak height: fraction of the angular distance, x R.
-                            // Igor, 2026-10-28: the flights hug the globe, they do not
-                            // arch away from it — anything much above ~0.08 leaves the hero.
-    arcWidthRatio: 0.0013,  // stroke width / canvas buffer size
-    arcOpacity: 0.55,
+    // How many flights. The list is ordered ring-first, so with four cities
+    // arcCount 4 gives every destination exactly one flight in and one out;
+    // 5 and 6 add the diagonals, below 4 it opens into a chain.
+    arcCount: 4,
+    arcAltitude: 0.075,     // peak height: fraction of the angular distance, x R.
+                            // The flights hug the globe; much above ~0.09 and they
+                            // arch out of the hero.
+    arcWidthRatio: 0.002,   // stroke width / canvas buffer size
+    // Stripe's globe does not keep the arc on screen: the line is drawn by the
+    // flight's own tail and then it is gone. arcPersist 0 is that; 1 brings the
+    // steady line back.
+    arcPersist: 0,
+    arcOpacity: 0.55,       // opacity of the steady line, when it is on
     arcColor: '#5cfe50',
     arcColor2: '#b7ffae',   // a lighter green — no white anywhere on the globe
     arcSamples: 72,
     // ---- the "flight" travelling along each arc
     flights: 1,
     flightMs: 5200,
-    flightTrail: 0.16,      // length of the comet tail, as a fraction of the arc
-    flightSize: 2.1,        // head size, as a multiple of the arc stroke width
+    flightTrail: 0.34,      // length of the comet tail, as a fraction of the arc
+                            // (long, because with arcPersist 0 the tail IS the arc)
+    flightSize: 1.4,        // head size, as a multiple of the arc stroke width
     // ---- card
     cardOffsetPx: 20,       // gap between the marker and the card edge
     cardBorder: 1,          // 0 = pure Figma black card with no hairline
@@ -223,70 +234,86 @@
   // AND inside the silhouette — that is exact for an orthographic camera.
   function occluded(v) { return v[2] < 0 && (v[0] * v[0] + v[1] * v[1]) < 1; }
 
-  function drawDisc(g, gs, v, R, cx, cy, yOff, rPx, col, alpha, t) {
-    var nz = v[2];
-    var ang = Math.atan2(-v[1], v[0]);          // screen direction of the normal
-    var bx = cx + v[0] * R, by = cy - v[1] * R + yOff;          // bottom face centre
-    var h = GE.discHeight * R;
-    var tx = bx + v[0] * h, ty = by - v[1] * h;                 // top face centre
-    var minor = Math.max(0.35, rPx * nz);       // foreshortening of the circle
-    var i, a, pts = [];
+  // Geometry of a flat cylinder standing on the sphere at v. Under an
+  // orthographic camera the circle of radius rPx in the tangent plane projects
+  // to an ellipse: minor axis rPx·v.z along the normal's screen direction,
+  // major axis rPx. Shared by the marker and by the pulse.
+  function cyl(v, R, cx, cy, yOff, rPx, hFrac) {
+    var h = hFrac * R;
+    var bx = cx + v[0] * R, by = cy - v[1] * R + yOff;
+    return {
+      ang: Math.atan2(-v[1], v[0]), nz: v[2], r: rPx,
+      bx: bx, by: by,
+      tx: bx + v[0] * h, ty: by - v[1] * h,
+      minor: Math.max(0.35, rPx * v[2])
+    };
+  }
 
-    if (GE.discGlow > 0) {                       // on the soft layer
-      var gl = gs.createRadialGradient(tx, ty, 0, tx, ty, rPx * 4.2);
+  // The silhouette is the convex hull of the bottom and top ellipses — the
+  // union of a convex shape and a copy of it offset by the extrusion vector IS
+  // their convex hull.
+  function cylPath(g, c) {
+    var pts = [], i, ca = Math.cos(c.ang), sa = Math.sin(c.ang);
+    for (i = 0; i < 28; i++) {
+      var a = i / 28 * 2 * Math.PI;
+      var ex = Math.cos(a) * c.minor, ey = Math.sin(a) * c.r;
+      var px = ex * ca - ey * sa, py = ex * sa + ey * ca;
+      pts.push([c.bx + px, c.by + py], [c.tx + px, c.ty + py]);
+    }
+    var hl = hull(pts), j;
+    g.beginPath();
+    g.moveTo(hl[0][0], hl[0][1]);
+    for (j = 1; j < hl.length; j++) g.lineTo(hl[j][0], hl[j][1]);
+    g.closePath();
+  }
+
+  function drawDisc(g, gs, v, R, cx, cy, yOff, rPx, col, alpha, t) {
+    var c = cyl(v, R, cx, cy, yOff, rPx, GE.discHeight);
+    var i;
+
+    if (GE.discGlow > 0) {                       // glow, on the soft layer
+      var gl = gs.createRadialGradient(c.tx, c.ty, 0, c.tx, c.ty, rPx * 4.2);
       gl.addColorStop(0, rgba(col, 0.42 * GE.discGlow * alpha));
       gl.addColorStop(1, rgba(col, 0));
       gs.fillStyle = gl;
       gs.beginPath();
-      gs.ellipse(tx, ty, rPx * 4.2, Math.max(0.5, rPx * 4.2 * nz), ang, 0, 2 * Math.PI);
+      gs.ellipse(c.tx, c.ty, rPx * 4.2, Math.max(0.5, rPx * 4.2 * c.nz), c.ang, 0, 2 * Math.PI);
       gs.fill();
     }
 
     if (GE.pulse) {
-      // A ripple running across the surface. Stroking an ellipse drew a hard
-      // ring that read as an orbit around the marker (Igor, 2026-10-28), so it
-      // is a soft radial band instead, squashed into the tangent plane by
-      // scaling the context rather than by stroking an ellipse path.
-      var ph = ((t % GE.pulseMs) / GE.pulseMs);
-      var rr = rPx * (1 + (GE.rippleScale - 1) * ph);
-      var sf = Math.max(0.05, Math.min(0.95, GE.rippleSoft));
-      gs.save();
-      gs.translate(bx, by);
-      gs.rotate(ang);
-      gs.scale(Math.max(0.05, nz), 1);
-      var rg = gs.createRadialGradient(0, 0, 0, 0, 0, rr);
-      rg.addColorStop(0, rgba(col, 0));
-      rg.addColorStop(Math.max(0.05, 1 - sf), rgba(col, 0));
-      rg.addColorStop(1 - sf * 0.35, rgba(col, 0.4 * (1 - ph) * (1 - ph) * alpha));
-      rg.addColorStop(1, rgba(col, 0));
-      gs.fillStyle = rg;
-      gs.beginPath();
-      gs.arc(0, 0, rr, 0, 2 * Math.PI);
-      gs.fill();
-      gs.restore();
+      // The pulse Igor asked back for: not a stroked ring (that read as an
+      // orbit) but an ULTRA-FLAT ghost cylinder growing horizontally out of the
+      // marker and fading. It is drawn on the soft layer, so it is blurred and
+      // it passes under the marker instead of covering it.
+      var n = Math.max(1, Math.round(GE.pulseCount));
+      for (i = 0; i < n; i++) {
+        var ph = ((t / GE.pulseMs) + i / n) % 1;
+        var fadeP = (1 - ph) * (1 - ph);
+        var aP = GE.rippleOpacity * fadeP * alpha;
+        if (aP <= 0.004) continue;
+        var rr = rPx * (1 + (GE.rippleScale - 1) * ph);
+        var cp = cyl(v, R, cx, cy, yOff, rr, GE.discHeight * GE.rippleFlat);
+        cylPath(gs, cp);
+        gs.fillStyle = rgba(col, aP * 0.75);     // the wall of the ghost
+        gs.fill();
+        gs.beginPath();                          // its top face
+        gs.ellipse(cp.tx, cp.ty, cp.minor, cp.r, cp.ang, 0, 2 * Math.PI);
+        gs.fillStyle = rgba(mix(col, 1.15), aP);
+        gs.fill();
+      }
     }
 
-    for (i = 0; i < 28; i++) {                   // the silhouette of the cylinder
-      a = i / 28 * 2 * Math.PI;
-      var ex = Math.cos(a) * minor, ey = Math.sin(a) * rPx;
-      var ca = Math.cos(ang), sa = Math.sin(ang);
-      var px = ex * ca - ey * sa, py = ex * sa + ey * ca;
-      pts.push([bx + px, by + py], [tx + px, ty + py]);
-    }
-    var hl = hull(pts);
+    cylPath(g, c);                               // the side wall
     g.fillStyle = rgba(mix(col, 1 - GE.discWall), alpha);
-    g.beginPath();
-    g.moveTo(hl[0][0], hl[0][1]);
-    for (i = 1; i < hl.length; i++) g.lineTo(hl[i][0], hl[i][1]);
-    g.closePath();
     g.fill();
 
     g.beginPath();                               // the lit top face
-    g.ellipse(tx, ty, minor, rPx, ang, 0, 2 * Math.PI);
+    g.ellipse(c.tx, c.ty, c.minor, c.r, c.ang, 0, 2 * Math.PI);
     if (GE.discShade > 0) {
       var ls = Math.hypot(LD[0], LD[1]) || 1;
       var sx = LD[0] / ls, sy = -LD[1] / ls;     // light direction on screen
-      var sg = g.createLinearGradient(tx - sx * rPx, ty - sy * rPx, tx + sx * rPx, ty + sy * rPx);
+      var sg = g.createLinearGradient(c.tx - sx * rPx, c.ty - sy * rPx, c.tx + sx * rPx, c.ty + sy * rPx);
       sg.addColorStop(0, rgba(mix(col, 1 - 0.45 * GE.discShade), alpha));
       sg.addColorStop(1, rgba(mix(col, 1 + 0.30 * GE.discShade), alpha));
       g.fillStyle = sg;
@@ -300,17 +327,22 @@
       g.lineWidth = Math.max(0.8, rPx * 0.1);
       g.stroke();
     }
-    return [tx, ty];
+    return [c.tx, c.ty];
   }
 
+  // Ordered ring first: with four cities, the first four pairs give every
+  // destination exactly one flight in and one out. Then the diagonals.
+  // arcCount takes the first N — that is the "more or less flights" handle.
   function arcPairs() {
-    var out = [], i, j;
-    if (GE.arcAll) {
-      for (i = 0; i < markers.length; i++) for (j = i + 1; j < markers.length; j++) out.push([i, j]);
-    } else {
-      for (i = 0; i + 1 < markers.length; i++) out.push([i, i + 1]);
+    var n = markers.length, out = [], i, j;
+    for (i = 0; i < n; i++) out.push([i, (i + 1) % n]);
+    for (i = 0; i < n; i++) {
+      for (j = i + 2; j < n; j++) {
+        if (i === 0 && j === n - 1) continue;    // that one is already the ring's last leg
+        out.push([i, j]);
+      }
     }
-    return out;
+    return out.slice(0, Math.max(0, Math.round(GE.arcCount)));
   }
 
   function drawArcs(g, m3, R, cx, cy, yOff, size, alpha, t) {
@@ -335,39 +367,46 @@
         vis.push(!occluded([v[0] * r, v[1] * r, v[2]]));
       }
 
-      var grad = g.createLinearGradient(pts[0][0], pts[0][1], pts[N][0], pts[N][1]);
-      grad.addColorStop(0, rgba(c1, GE.arcOpacity * alpha));
-      grad.addColorStop(0.5, rgba(c2, GE.arcOpacity * 0.75 * alpha));
-      grad.addColorStop(1, rgba(c1, GE.arcOpacity * alpha));
-      g.strokeStyle = grad;
-      g.lineWidth = lw;
       g.lineCap = 'round';
       g.lineJoin = 'round';
 
-      var open = false;                           // stroke each visible run
-      g.beginPath();
-      for (i = 0; i <= N; i++) {
-        if (!vis[i]) { open = false; continue; }
-        if (!open) { g.moveTo(pts[i][0], pts[i][1]); open = true; }
-        else g.lineTo(pts[i][0], pts[i][1]);
+      if (GE.arcPersist) {                        // the steady line, off by default
+        var grad = g.createLinearGradient(pts[0][0], pts[0][1], pts[N][0], pts[N][1]);
+        grad.addColorStop(0, rgba(c1, GE.arcOpacity * alpha));
+        grad.addColorStop(0.5, rgba(c2, GE.arcOpacity * 0.75 * alpha));
+        grad.addColorStop(1, rgba(c1, GE.arcOpacity * alpha));
+        g.strokeStyle = grad;
+        g.lineWidth = lw;
+        var open = false;                         // stroke each visible run
+        g.beginPath();
+        for (i = 0; i <= N; i++) {
+          if (!vis[i]) { open = false; continue; }
+          if (!open) { g.moveTo(pts[i][0], pts[i][1]); open = true; }
+          else g.lineTo(pts[i][0], pts[i][1]);
+        }
+        g.stroke();
       }
-      g.stroke();
 
-      if (!GE.flights) continue;                  // the comet running along the arc
+      if (!GE.flights) continue;
+      // The flight. With arcPersist 0 this tail is the only thing that ever
+      // draws the arc: it paints it on the way and it is gone behind the head.
       var ph = ((t / GE.flightMs) + k / pairs.length) % 1;
       var head = Math.round(ph * N);
-      var tail = Math.max(0, head - Math.round(GE.flightTrail * N));
-      for (i = tail; i < head; i++) {
+      var span = Math.max(1, Math.round(GE.flightTrail * N));
+      var tail = head - span;
+      for (i = Math.max(0, tail); i < head; i++) {
         if (!vis[i] || !vis[i + 1]) continue;
-        var f = (i - tail) / Math.max(1, head - tail);
-        g.strokeStyle = rgba(c2, Math.min(1, 0.85 * f * f * alpha));
-        g.lineWidth = lw * (1 + 1.1 * f);
+        var f = (i - tail) / span;                // 0 at the end of the tail, 1 at the head
+        var aT = Math.min(1, 0.95 * f * f * f * alpha);
+        if (aT <= 0.004) continue;
+        g.strokeStyle = rgba(c2, aT);
+        g.lineWidth = lw * (0.45 + 0.75 * f);     // the tail tapers into nothing
         g.beginPath();
         g.moveTo(pts[i][0], pts[i][1]);
         g.lineTo(pts[i + 1][0], pts[i + 1][1]);
         g.stroke();
       }
-      if (vis[head]) {
+      if (vis[head] && GE.flightSize > 0) {
         g.fillStyle = rgba(c2, 0.9 * alpha);
         g.beginPath();
         g.arc(pts[head][0], pts[head][1], lw * GE.flightSize, 0, 2 * Math.PI);
