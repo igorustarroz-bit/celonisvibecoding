@@ -5,7 +5,8 @@ experiment always carries its handles, and always says what the antialiasing is 
 doing.** Before 2026-09-13 each experiment had grown its own copy of the same panel; this is
 the one implementation all of them use now.
 
-Files: `experiments/lib/tuner-ui.js` and `experiments/lib/tuner-ui.css` (`?v=1`).
+Files: `experiments/lib/tuner-ui.js` (`?v=2` since the chip repaint fix,
+2026-10-28) and `experiments/lib/tuner-ui.css` (`?v=1`).
 Read `claude_antiphishing_context.md` §8 first if you are touching anything about *why* the
 controls are built the way they are.
 
@@ -87,18 +88,38 @@ on a 150 ms timer while nobody is dragging it.
 
 | experiment | panel file | global | id | accent |
 |---|---|---|---|---|
+| 2 globe events | `3d-globe/anime-globe/globe-events-tuner.js` | `window.GLOBE_EVENTS` | `ge-tuner` | `#5cfe50` |
 | 3 Data Core | `datacore/anime-datacore/datacore-tuner.js` | `window.DATACORE` | `dc-tuner` | `#5cfe50` |
 | 4 3D book | `3d-book/book-fx/book-tuner.js` | `window.BOOK` | `bk-tuner` | `#5cfe50` |
 | 5 celosphere | `celosphere/celosphere-fx/seal-tuner.js` | `window.SEAL` | `sl-tuner` | `#5cfe50` |
 | 6 Context Model | `context-model/context-fx/context-tuner.js` | `window.CONTEXT` | `context-tuner` | `#7fd7c4` |
 
-Experiment 2 (`3d-globe/`) has **no tuner at all** and never did: `globe.js` keeps its `CFG`
-private and exposes no global. Giving it one means exposing `CFG` and deciding which changes
-need a geometry rebuild — open work, not a port.
+Experiment 2 got a panel on 2026-10-28, but only for the **event markers** it gained that
+day (`window.GLOBE_EVENTS`). `globe.js` itself still keeps its `CFG` private and exposes no
+global for it. Giving the globe one means exposing `CFG` and deciding which changes need a
+geometry rebuild — open work, not a port.
 
 Load order on a page: `tuner-ui.css` with the other shared stylesheets, then
 `lib/tuner-ui.js` **before** the experiment's own tuner file. Each tuner also polls for its
 global with a `setTimeout`, so it survives the effect starting late.
+
+## The repaint bug (2026-10-28) — read this before adding a control
+
+`Panel._commit()` writes the value, the read-out and the amber mark. It does
+**not** repaint the control. Every control had been getting away with it for a
+different reason: a slider repaints itself from inside its own drag, and
+`colour()` calls `entry.paint()` explicitly in its write callback. **`choice()`
+had neither**, so clicking a chip moved the value and the number on the right
+while the highlight stayed on the old chip — in every experiment, since the
+kit landed. Igor spotted it as "the selected state of the toggles is wrong".
+
+`choice()` now calls `entry.paint()` after `_commit`. **A new control must
+repaint itself after committing**, or do it from `_commit` — which was left
+alone on purpose, because calling a slider's `paint()` mid-drag would fight the
+drag.
+
+Verification that catches it: click *every* chip of *every* row and assert the
+highlight lands on the one you clicked and that exactly one is lit.
 
 ## Gotchas that cost time
 
