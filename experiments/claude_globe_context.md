@@ -4,6 +4,10 @@
 > anti-phishing cleanup → nav-fx → index → publish) is in
 > `claude_newexperiment_context.md`.
 
+> **Event markers (2026-10-28):** the green city dots and the Web DS city card
+> added on top of this globe are documented in
+> `claude_globeevents_context.md`. They do not change `globe.js`.
+
 > This document lives in `experiments/` alongside the other `claude_*_context.md`
 > files (all uploaded there on 2026-09-03). **The paths in this doc are relative to
 > `experiments/`.**
