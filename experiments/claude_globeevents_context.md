@@ -181,6 +181,21 @@ The tail is a fraction of the trip; the tuner shows it as a **%** through the
 kit's `read`/`write` options (stored 0–1, shown 0–100). `flightGlow` adds a wide
 faint pass under the tail and a radial halo at the head.
 
+**The cycle is travel + drain + wait.** Constant speed has a side effect: two
+cities that sit close together are a sub-second hop, and the flight just blinks
+(Igor, 2026-10-28). `flightWaitMs` is a pause on the ground after each lap:
+
+```
+travel = max(200, flightMs · ω/π)
+active = travel · (1 + flightTrail)     // the tail drains after the head lands
+cycle  = active + flightWaitMs
+```
+
+At the defaults Munich–Madrid spends 48 % of its cycle idle, Madrid–San
+Francisco 12 %, the round-the-world loop 6 %. The head dot is hidden once
+`q > 1`, so what you see at the end is the tail draining into the destination
+rather than everything vanishing at the wrap.
+
 **Occlusion is exact for an orthographic camera**: a point above the sphere is
 hidden only when `z < 0` **and** `x² + y² < 1` — behind the centre plane *and*
 inside the silhouette. Testing `z < 0` alone would chop the arcs where they fly
@@ -208,7 +223,29 @@ plus a head) travels along each arc, staggered by arc index.
   are not drawn, and the open card closes itself if its city rotates away (it
   cannot happen while `pauseSpin` is on).
 
-## 8. The card (Figma → CSS)
+## 8. The card — how it opens
+
+It **grows out of the point that was clicked** (Igor, 2026-10-28):
+
+- `transform-origin` is the marker in the card's own coordinates. ⚠️ Compute it
+  from `offsetLeft` / `offsetWidth`, **never** `getBoundingClientRect()` — the
+  rect is already shrunk by the `scale(0.14)` start state and the origin lands
+  in the wrong place.
+- The card is placed with **`left` / `top`**, not `transform`, precisely so the
+  transform is free for the grow. `placeCard()` writes left/top every frame.
+- Then the five parts (kicker, city, badge, button, date) fade and travel in one
+  after the other, `--ge-i` × `--ge-seq` after `0.7 × --ge-grow`. The delay is
+  declared only under `.is-open`, so **closing** takes everything out at once.
+  The badge already carries a centring transform, so its travel is folded into
+  that `translate(-50%, …)` rather than added as a second rule.
+- ⚠️ The `is-open` class goes on **right after the forced reflow**, not in a
+  `requestAnimationFrame`. That callback queues behind the globe's own render
+  frame and cost ~100 ms of dead time before the grow even started. The reflow
+  has already computed the start state, which is all the transition needs.
+
+Knobs: `cardGrowMs`, `cardStaggerMs`. End to end it measures ~600 ms.
+
+## 9. The card (Figma → CSS)
 
 Source: `Web DS | Components`, file `tBZiqZtdfjJXmCflrpjN1U`, frame
 `Card08-City-collab` (`13966:72135`); the per-city variants are
@@ -273,7 +310,7 @@ d = minidom.parse(f); r = d.documentElement
 assert r.tagName == 'svg' and r.getAttribute('xmlns') == 'http://www.w3.org/2000/svg'
 ```
 
-## 9. The tuner panel
+## 10. The tuner panel
 
 `window.GLOBE_EVENTS` is the live settings object; `globe-events-tuner.js`
 builds the panel on `lib/tuner-ui.js` (id `ge-tuner`, accent `#5cfe50`, hotkey
@@ -295,7 +332,7 @@ markers: `globe.js` still keeps its `CFG` private and exposes no global for it,
 so "a tuner for the globe itself" is still open work (see
 `claude_tunerui_context.md`).
 
-## 10. Verification done before the push
+## 11. Verification done before the push
 
 - `python3 experiments/defuse-inputs.py --report` → clean over all 44 tracked
   HTML files.
@@ -313,7 +350,7 @@ so "a tuner for the globe itself" is still open work (see
 - The only 404s are the client images and fonts that were deliberately not
   staged for the test.
 
-## 11. Ideas not done
+## 12. Ideas not done
 
 - A leader line from the marker to the card.
 - Auto-rotating the globe to bring a city to the front when its card is opened
