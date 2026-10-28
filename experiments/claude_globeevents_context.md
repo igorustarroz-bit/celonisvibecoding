@@ -270,9 +270,22 @@ Three things that cost time here:
    right.
 3. **Two colours, not one.** `badgeDrawColor` is the line it is drawn with and
    `badgeFillColor` what it ends up as: the same value on both gives one
-   colour, and white→green or green→white is just the two swapped.
-   `badgeGlow` adds a `drop-shadow`, and `badgeGlowDraw` keeps that halo for
-   the drawing only — it fades out 60 ms after the last stroke lands.
+   colour, and white→green or green→white is just the two swapped. The swap
+   from line to fill stays instantaneous (see 1) and the **colour change comes
+   after it**, over `badgeTintMs` — pure colour, so it moves no geometry and
+   can be as slow as you like.
+4. **That tint has to be a Web Animation, not a transition.** A 1 ms
+   transition immediately followed by a long one reads its start value from
+   whatever the computed style happens to be at that instant, and Chrome handed
+   it the pre-swap *transparent* value: the badge faded up from nothing instead
+   of turning from green to white. Explicit keyframes
+   (`el.animate([{fill: line, offset: 0.0001}, {fill: final}], {delay, fill:'both'})`)
+   depend on nothing. Measured: transparent → `rgb(102,255,90)` →
+   `rgb(168,255,162)` → white, no alpha anywhere.
+5. **One drop-shadow over a 0.7 px hairline is almost invisible.** The halo is
+   stacked — `badgeGlowLayers` (1–3): a tight bright one, then wider and
+   fainter ones over it. `badgeGlowDraw` keeps the halo for the drawing only,
+   fading it 60 ms after the last stroke *and its tint* have landed.
 
 ⚠️ That needs the SVG **inlined in the document** — an `<img>` cannot be
 animated — so the four files are fetched once at boot into `BADGE_SVG`.
