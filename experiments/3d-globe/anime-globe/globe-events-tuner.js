@@ -71,7 +71,9 @@
         ["badgeOrder", "Shapes: 0 all at once / 1 upwards / 2 downwards", [0, 1, 2]],
         ["@colour", "Badge line while drawing", "badgeDrawColor"],
         ["@colour", "Badge colour once drawn", "badgeFillColor"],
-        ["badgeGlow", "Badge glow", 0, 3, 0.1],
+        ["badgeTintMs", "Line colour -> final colour (ms)", 0, 3000, 50],
+        ["badgeGlow", "Badge glow (uses the line colour)", 0, 6, 0.1],
+        ["badgeGlowLayers", "Glow layers stacked", [1, 2, 3]],
         ["badgeGlowDraw", "Glow only while drawing", [0, 1]],
         ["cardBorder", "Hairline border (0 = pure Figma black)", [0, 1]],
         ["pauseSpin", "Pause the spin while open", [0, 1]]

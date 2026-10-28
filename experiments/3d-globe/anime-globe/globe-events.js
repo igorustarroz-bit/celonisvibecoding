@@ -86,17 +86,23 @@
     // and the white fill arrives behind it. Needs the SVG inlined, so it falls
     // back to the plain fade when the file cannot be read (see setBadge).
     badgeDraw: 1,
-    badgeDrawMs: 1100,
+    badgeDrawMs: 1700,
     badgeStroke: 0.7,       // width of the drawing line, in the SVG's own units
     // 0 = every shape at once, 1 = upwards (bottom to top), 2 = downwards
     badgeOrder: 1,
     // Two colours: the line it is drawn with, and the fill it ends up as. Same
     // value on both = one colour throughout; white then green, or green then
     // white, is just the two of them swapped.
-    badgeDrawColor: '#ffffff',
+    badgeDrawColor: '#5cff50',
     badgeFillColor: '#ffffff',
-    badgeGlow: 0,           // halo around the badge (0 = none)
-    badgeGlowDraw: 1,       // 1 = only while it is being drawn, 0 = always on
+    // The shape swaps from the line to the fill instantly — anything slower
+    // shows stroke and fill at once and the weight looks wrong — and THEN it
+    // tints from one colour to the other, which is pure colour and moves no
+    // geometry. badgeTintMs is how long that takes (0 = straight to the fill).
+    badgeTintMs: 650,
+    badgeGlow: 2.9,         // halo around the badge (0 = none)
+    badgeGlowLayers: 2,     // stacked drop-shadows; one alone barely shows on a hairline
+    badgeGlowDraw: 0,       // 1 = only while it is being drawn, 0 = always on
     cardBorder: 1,          // 0 = pure Figma black card with no hairline
     pauseSpin: 1,           // 1 = the auto-spin stops while a card is open
     events: [
@@ -218,21 +224,33 @@
     return out;
   }
 
+  // One drop-shadow over a 0.7px hairline is almost invisible, so the halo is
+  // stacked: a tight bright one, then wider and fainter ones over it.
   function badgeGlowCss(a) {
     var c = rgb(GE.badgeDrawColor);
-    return 'drop-shadow(0 0 ' + (GE.badgeGlow * 3 * a).toFixed(2) + 'px ' + rgba(c, 0.85 * a) + ')';
+    var n = Math.max(1, Math.min(3, Math.round(GE.badgeGlowLayers)));
+    var out = [], i, spread = [0.6, 1.5, 2.8], alpha = [0.85, 0.55, 0.35];
+    for (i = 0; i < n; i++) {
+      out.push('drop-shadow(0 0 ' + (GE.badgeGlow * 3 * spread[i] * a).toFixed(2) + 'px ' +
+               rgba(c, alpha[i] * a) + ')');
+    }
+    return out.join(' ');
   }
 
   function armDraw(svg) {                        // the un-drawn state
     var ps = badgePaths(svg), i;
     var dc = rgb(GE.badgeDrawColor), fc = rgb(GE.badgeFillColor);
     clearTimeout(svg.__geGlowT);
+    (svg.__geTint || []).forEach(clearTimeout);
+    (svg.__geAnims || []).forEach(function (a) { try { a.cancel(); } catch (e) {} });
+    svg.__geTint = [];
+    svg.__geAnims = [];
     svg.style.transition = 'none';
     svg.style.filter = GE.badgeGlow > 0 ? badgeGlowCss(1) : '';
     for (i = 0; i < ps.length; i++) {
       var el = ps[i].el;
       el.style.transition = 'none';
-      el.style.fill = rgba(fc, 0);
+      el.style.fill = rgba(dc, 0);               // transparent, in the LINE colour
       el.style.stroke = rgba(dc, 1);
       el.style.strokeWidth = GE.badgeStroke;
       el.style.strokeLinecap = 'round';
@@ -260,6 +278,8 @@
     var spread = mode === 0 ? 0 : total * 0.55;  // 0 = every shape at once
     var each = mode === 0 ? total : total * 0.45;
     var dc = rgb(GE.badgeDrawColor), fc = rgb(GE.badgeFillColor);
+    var tint = Math.max(0, GE.badgeTintMs);
+    svg.__geTint = svg.__geTint || [];
 
     void svg.getBoundingClientRect();            // flush the armed state
     for (var i = 0; i < order.length; i++) {
@@ -270,11 +290,28 @@
       // through, which read as the line changing weight (Igor, 2026-10-28).
       el.style.transition =
         'stroke-dashoffset ' + each.toFixed(0) + 'ms cubic-bezier(0.3,0.7,0.3,1) ' + d.toFixed(0) + 'ms,' +
-        'fill 1ms linear ' + (d + each).toFixed(0) + 'ms,' +
         'stroke 1ms linear ' + (d + each).toFixed(0) + 'ms';
       el.style.strokeDashoffset = '0';
-      el.style.fill = rgba(fc, 1);
       el.style.stroke = rgba(dc, 0);
+
+      // The fill is a Web Animation, not a transition. Two reasons: the swap
+      // from line to fill has to be instantaneous (a cross-fade shows both and
+      // the weight looks wrong) and the tint that follows has to be slow — and
+      // a 1 ms transition immediately followed by a long one reads its start
+      // value from whatever the computed style happens to be at that moment,
+      // which gave a fade up from transparent instead of green turning white.
+      // Explicit keyframes depend on nothing.
+      if (el.animate) {
+        svg.__geAnims.push(el.animate([
+          { fill: rgba(dc, 0), offset: 0 },
+          { fill: rgba(dc, 1), offset: 0.0001, easing: 'ease' },
+          { fill: rgba(fc, 1), offset: 1 }
+        ], { duration: Math.max(1, tint), delay: d + each, fill: 'both' }));
+        el.style.fill = rgba(fc, 1);             // the resting value underneath
+      } else {
+        el.style.transition += ',fill 1ms linear ' + (d + each).toFixed(0) + 'ms';
+        el.style.fill = rgba(fc, 1);
+      }
     }
 
     if (GE.badgeGlow > 0 && GE.badgeGlowDraw) {  // the halo belongs to the drawing
@@ -282,7 +319,7 @@
       svg.__geGlowT = setTimeout(function () {
         svg.style.transition = 'filter 450ms ease';
         svg.style.filter = badgeGlowCss(0);
-      }, spread + each + 60);
+      }, spread + each + tint + 60);
     }
   }
 
