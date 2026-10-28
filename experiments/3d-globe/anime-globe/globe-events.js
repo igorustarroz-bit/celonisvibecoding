@@ -87,6 +87,16 @@
     // back to the plain fade when the file cannot be read (see setBadge).
     badgeDraw: 1,
     badgeDrawMs: 1100,
+    badgeStroke: 0.7,       // width of the drawing line, in the SVG's own units
+    // 0 = every shape at once, 1 = upwards (bottom to top), 2 = downwards
+    badgeOrder: 1,
+    // Two colours: the line it is drawn with, and the fill it ends up as. Same
+    // value on both = one colour throughout; white then green, or green then
+    // white, is just the two of them swapped.
+    badgeDrawColor: '#ffffff',
+    badgeFillColor: '#ffffff',
+    badgeGlow: 0,           // halo around the badge (0 = none)
+    badgeGlowDraw: 1,       // 1 = only while it is being drawn, 0 = always on
     cardBorder: 1,          // 0 = pure Figma black card with no hairline
     pauseSpin: 1,           // 1 = the auto-spin stops while a card is open
     events: [
@@ -199,23 +209,36 @@
   function badgePaths(svg) {
     var all = svg.querySelectorAll('path'), out = [], i, len;
     for (i = 0; i < all.length; i++) {
+      // getTotalLength() works on a display:none subtree; getBBox() does NOT,
+      // and armDraw runs before the card is shown — so the vertical position
+      // each shape is ordered by is measured later, in runDraw.
       try { len = all[i].getTotalLength(); } catch (e) { len = 0; }
-      if (len > 0.5) out.push([all[i], len]);
+      if (len > 0.5) out.push({ el: all[i], len: len, cy: 0 });
     }
     return out;
   }
 
+  function badgeGlowCss(a) {
+    var c = rgb(GE.badgeDrawColor);
+    return 'drop-shadow(0 0 ' + (GE.badgeGlow * 3 * a).toFixed(2) + 'px ' + rgba(c, 0.85 * a) + ')';
+  }
+
   function armDraw(svg) {                        // the un-drawn state
     var ps = badgePaths(svg), i;
+    var dc = rgb(GE.badgeDrawColor), fc = rgb(GE.badgeFillColor);
+    clearTimeout(svg.__geGlowT);
+    svg.style.transition = 'none';
+    svg.style.filter = GE.badgeGlow > 0 ? badgeGlowCss(1) : '';
     for (i = 0; i < ps.length; i++) {
-      var el = ps[i][0], len = ps[i][1];
+      var el = ps[i].el;
       el.style.transition = 'none';
-      el.style.fill = 'rgba(255,255,255,0)';
-      el.style.stroke = '#ffffff';
-      el.style.strokeWidth = '0.7';
+      el.style.fill = rgba(fc, 0);
+      el.style.stroke = rgba(dc, 1);
+      el.style.strokeWidth = GE.badgeStroke;
       el.style.strokeLinecap = 'round';
-      el.style.strokeDasharray = len.toFixed(2);
-      el.style.strokeDashoffset = len.toFixed(2);
+      el.style.strokeLinejoin = 'round';
+      el.style.strokeDasharray = ps[i].len.toFixed(2);
+      el.style.strokeDashoffset = ps[i].len.toFixed(2);
     }
     svg.__gePaths = ps;
   }
@@ -224,18 +247,42 @@
     var ps = svg.__gePaths || badgePaths(svg);
     var n = ps.length || 1;
     var total = Math.max(120, GE.badgeDrawMs);
-    var each = total * 0.45;                     // how long one stroke takes
-    var spread = total * 0.55;                   // when the last one starts
+    var mode = Math.round(GE.badgeOrder);
+    var order = ps.slice(), bb, i2;
+    if (mode === 1 || mode === 2) {
+      for (i2 = 0; i2 < ps.length; i2++) {       // the card is on screen by now
+        try { bb = ps[i2].el.getBBox(); } catch (e) { bb = { y: 0, height: 0 }; }
+        ps[i2].cy = bb.y + bb.height / 2;
+      }
+      if (mode === 1) order.sort(function (a, b) { return b.cy - a.cy; });   // bottom to top
+      else order.sort(function (a, b) { return a.cy - b.cy; });              // top to bottom
+    }
+    var spread = mode === 0 ? 0 : total * 0.55;  // 0 = every shape at once
+    var each = mode === 0 ? total : total * 0.45;
+    var dc = rgb(GE.badgeDrawColor), fc = rgb(GE.badgeFillColor);
+
     void svg.getBoundingClientRect();            // flush the armed state
-    for (var i = 0; i < ps.length; i++) {
-      var el = ps[i][0], d = (i / n) * spread;
+    for (var i = 0; i < order.length; i++) {
+      var el = order[i].el, d = (i / n) * spread;
+      // The hand-over is a SWAP, not a cross-fade: the line keeps exactly the
+      // width it was drawn with and the fill takes over the instant the stroke
+      // finishes. Overlapping the two made the shape look thicker halfway
+      // through, which read as the line changing weight (Igor, 2026-10-28).
       el.style.transition =
         'stroke-dashoffset ' + each.toFixed(0) + 'ms cubic-bezier(0.3,0.7,0.3,1) ' + d.toFixed(0) + 'ms,' +
-        'fill 320ms ease ' + (d + each * 0.65).toFixed(0) + 'ms,' +
-        'stroke 320ms ease ' + (d + each * 0.65).toFixed(0) + 'ms';
+        'fill 1ms linear ' + (d + each).toFixed(0) + 'ms,' +
+        'stroke 1ms linear ' + (d + each).toFixed(0) + 'ms';
       el.style.strokeDashoffset = '0';
-      el.style.fill = '#ffffff';
-      el.style.stroke = 'rgba(255,255,255,0)';
+      el.style.fill = rgba(fc, 1);
+      el.style.stroke = rgba(dc, 0);
+    }
+
+    if (GE.badgeGlow > 0 && GE.badgeGlowDraw) {  // the halo belongs to the drawing
+      clearTimeout(svg.__geGlowT);
+      svg.__geGlowT = setTimeout(function () {
+        svg.style.transition = 'filter 450ms ease';
+        svg.style.filter = badgeGlowCss(0);
+      }, spread + each + 60);
     }
   }
 

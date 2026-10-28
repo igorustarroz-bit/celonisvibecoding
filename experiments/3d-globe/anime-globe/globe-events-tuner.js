@@ -67,6 +67,12 @@
         ["cardStaggerMs", "Contents, one after the other (ms)", 0, 300, 5],
         ["badgeDraw", "Draw the badge outline (0 = plain fade)", [0, 1]],
         ["badgeDrawMs", "Badge drawing time (ms)", 200, 3000, 50],
+        ["badgeStroke", "Badge line weight", 0.2, 2.5, 0.05],
+        ["badgeOrder", "Shapes: 0 all at once / 1 upwards / 2 downwards", [0, 1, 2]],
+        ["@colour", "Badge line while drawing", "badgeDrawColor"],
+        ["@colour", "Badge colour once drawn", "badgeFillColor"],
+        ["badgeGlow", "Badge glow", 0, 3, 0.1],
+        ["badgeGlowDraw", "Glow only while drawing", [0, 1]],
         ["cardBorder", "Hairline border (0 = pure Figma black)", [0, 1]],
         ["pauseSpin", "Pause the spin while open", [0, 1]]
       ]]
