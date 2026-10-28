@@ -42,13 +42,22 @@ for ~10 minutes. `original.html` is untouched, as always.
 
 ## 3. Two layers, on purpose
 
-**`.ge-canvas` — the visuals.** A second canvas inserted right after
-`#earth-canvas`, inside `p.world`, `position: absolute; inset: 0`, with the
-**same buffer size** as the globe's (`canvas.width`), so a point computed in the
-globe's internal coordinates lands on the same pixel. It is `pointer-events:
-none`, so the globe keeps its drag, its inertia and its "needle" focus, and it
-deliberately carries **no CSS filter** — `#earth-canvas` has `blur(0.6px)` and
-the markers have to stay sharp.
+**Two `.ge-canvas` layers — the visuals.** Both inserted after `#earth-canvas`
+inside `p.world`, `position: absolute; inset: 0`, with the **same buffer size**
+as the globe's (`canvas.width`), so a point computed in the globe's internal
+coordinates lands on the same pixel. Both are `pointer-events: none`, so the
+globe keeps its drag, its inertia and its "needle" focus.
+
+- `.ge-canvas--soft` — glow, ripple and the flight arcs, `blur(1.9px)`.
+- `.ge-canvas--disc` — the cylinders, `blur(0.4px)`, stacked above.
+
+⚠️ Igor asked for everything green to sit softer than the dashes (2026-10-28),
+but **one** blur strong enough for the glow turns a half-size cylinder into a
+green blob — the geometry disappears. Hence the split. Both values are set from
+JS (`blurPx`, `discBlurPx`) so the tuner can reach them; the CSS only carries
+the value that applies before the first frame. Stacking here is **DOM order**,
+so the soft layer is inserted first and the disc layer after it — inserting both
+with `canvas.nextSibling` silently puts them in the wrong order.
 `p.world` is given `position: relative` if it is still static; in practice the
 scroll transform already makes it a containing block.
 
@@ -106,9 +115,14 @@ Drawn in three passes, all from the marker's rotated normal `v` (= its unit
 position in view space):
 
 1. **Glow** — a radial gradient under the marker, itself squashed by `v.z`.
-2. **Ripple** — the old CSS halo, now an expanding ellipse *in the tangent
-   plane*, so it foreshortens with the globe instead of staying a flat circle.
+2. **Ripple** — the old CSS halo, in the tangent plane so it foreshortens with
+   the globe. It started as a *stroked* ellipse and read as an orbit ring around
+   the marker (Igor, 2026-10-28); it is now a soft radial band, squashed by
+   scaling the context rather than by stroking an ellipse path. Knob:
+   `rippleSoft`.
 3. **The cylinder** — bottom centre at `v·R`, top centre at `v·(1+discHeight)·R`.
+
+Passes 1 and 2 go on the soft canvas, pass 3 on the sharp one.
 
 The geometry that matters: under an orthographic camera the circle of radius `r`
 in the tangent plane projects to an **ellipse** whose minor axis is `r·v.z`,
@@ -125,12 +139,27 @@ reads as a flat circle whenever you look straight down on it — which is exactl
 what the physics says, since the wall only becomes visible towards the limb.
 `discShade` is that knob.
 
+Sizes after Igor's review: `discRadiusDeg` 0.85 (half of the first pass),
+`discHeight` 0.014, and **no rim** (`discEdge` 0 — a white outline read as a
+hard line; when it is turned on it now takes the marker's own colour). The hit
+area keeps its 24 px floor, so halving the marker did not make it harder to
+tap.
+
 ## 6. The flight arcs
 
 Great circles between the cities — every pair (6 arcs) or a single chain
 (`arcAll`). For each one: `slerp` between the two unit vectors, lifted by
 `1 + arcAltitude·(ω/π)·sin(π·t)` so longer hops fly higher, sampled
 `arcSamples` times, rotated by the same matrix and projected.
+
+⚠️ **`arcAltitude` 0.42 was wrong**: the flights arched right out of the hero
+frame. Igor wants them hugging the globe, as in the reference. The default is
+**0.055** — measured, the arcs then rise 14 px above the silhouette on a 688 px
+radius — and the knob starts at 0.005. Anything much above ~0.08 leaves the
+frame again on a 900 px-tall viewport.
+
+**No white.** `arcColor2` is a light green (`#b7ffae`), and the comet and its
+tail follow it. Nothing on this overlay is white any more.
 
 **Occlusion is exact for an orthographic camera**: a point above the sphere is
 hidden only when `z < 0` **and** `x² + y² < 1` — behind the centre plane *and*
@@ -211,8 +240,11 @@ Knobs, in five sections: **Marker** (`discRadiusDeg`, `discHeight`, `discWall`,
 (`pulse`, `pulseMs`, `rippleScale`), **Flight arcs** (`arcs`, `arcAll`,
 `arcAltitude`, `arcWidthRatio`, `arcOpacity`, `arcSamples`), **Flights**
 (`flights`, `flightMs`, `flightTrail`, `flightSize`) and **Card**
-(`cardOffsetPx`, `cardBorder`, `pauseSpin`). Plus one action button per city
-(opens that card) and "Close card".
+(`cardOffsetPx`, `cardBorder`, `pauseSpin`). Both blurs (`blurPx`,
+`discBlurPx`) are knobs, and so are the colours — `discColor`, `arcColor` and
+`arcColor2` use the kit's `colour()` swatch. Plus one action button per city
+(opens that card) and "Close card". 30 rows in all, every path resolving
+against `GLOBE_EVENTS`.
 
 This is the **first** panel experiment 2 has ever had. It only reaches the
 markers: `globe.js` still keeps its `CFG` private and exposes no global for it,
@@ -223,9 +255,11 @@ so "a tuner for the globe itself" is still open work (see
 
 - `python3 experiments/defuse-inputs.py --report` → clean over all 44 tracked
   HTML files.
-- Playwright at 1440×900 (cloud container, local `http.server`): the overlay
-  canvas shares the globe's box and buffer to the pixel and is actually painted
-  (~30 k non-transparent pixels), 4 hit areas built,
+- Playwright at 1440×900 (cloud container, local `http.server`): both overlay
+  canvases share the globe's box and buffer to the pixel and are actually
+  painted, in the right stacking order; the arcs rise 14 px above the globe's
+  silhouette; the 30 tuner rows all resolve against `GLOBE_EVENTS`; 4 hit areas
+  built,
   `input,select,textarea,form` count 0 with the panel mounted, card opens with
   the right city/date/badge, `state.spin` frozen while open and moving again
   after Esc, no page errors.
