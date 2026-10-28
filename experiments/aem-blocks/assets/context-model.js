@@ -26,11 +26,12 @@
    can write `camAz | 30` or `bloom | 0.4` in the block and see it. Unknown
    keys are reported and ignored rather than silently dropped.
 
-   Limitation, stated rather than hidden: context-core.js binds to the element
-   ids `context-stage` / `context-sticky` / `context-scroll`, so one instance
-   per page. A second one renders a notice instead of a second scene. Making
-   the scene instance-scoped is the next change, and it is the same change
-   that would let it be authored twice on one page.
+   Since 2026-10-28 the scene is instance-scoped: context-core.js publishes
+   `window.ContextModelScene.create({ canvas, sticky, scrollBox })` and returns
+   a control surface with a real `destroy()`, so a page can hold more than one
+   of these — which is what the block library page needs. The old fixed ids
+   still boot experiment 6's own page by themselves; here the stage is built
+   with classes instead.
    ========================================================================= */
 (function () {
   "use strict";
@@ -47,7 +48,9 @@
   ];
   const TUNER_JS = url("../../context-model/context-fx/context-tuner.js?v=5");
 
-  let mounted = false;
+  /* The tuner reads window.CONTEXT, and there is only one of those. The first
+     instance that asks for a tuner gets it; later ones render without one. */
+  let tunerTaken = false;
 
   function notice(target, text) {
     const box = document.createElement("div");
@@ -59,19 +62,19 @@
   }
 
   /* The stage context-core.js expects: a tall scroll container, a sticky box
-     inside it, and the canvas. Identical to the markup experiment 6 injects
-     into the saved page — the ids are what the effect binds to. */
+     inside it, and the canvas. Classes, not ids — the ids belong to experiment
+     6's own page, which boots itself. */
   function buildStage(target) {
     const scroll = document.createElement("div");
-    scroll.id = "context-scroll";
+    scroll.className = "context-scroll";
     const sticky = document.createElement("div");
-    sticky.id = "context-sticky";
+    sticky.className = "context-sticky";
     const canvas = document.createElement("canvas");
-    canvas.id = "context-stage";
+    canvas.className = "context-stage";
     sticky.append(canvas);
     scroll.append(sticky);
     target.replaceChildren(scroll);
-    return canvas;
+    return { canvas: canvas, sticky: sticky, scrollBox: scroll };
   }
 
   /* Authored values are strings. Coerce each one to the type of the default it
@@ -93,8 +96,7 @@
   /* Keys the block itself owns; never scene settings. */
   const RESERVED = ["name", "modalHash", "videoAnimation", "tuner", "theme"];
 
-  function applySettings(props) {
-    const api = window.CONTEXT;
+  function applySettings(api, props) {
     if (!api) return;
     const applied = [];
     const unknown = [];
@@ -122,20 +124,18 @@
 
     if (!target) throw new Error("ContextModel needs a target element");
 
-    if (mounted) {
-      notice(target, "Context Model is already running on this page — the scene binds to fixed element ids, so it can only be placed once.");
-      return;
-    }
-    mounted = true;
-
     this.target = target;
     this.props = props;
+    this.scene = null;
 
     const loadCSS = window.EDSLite.loadCSS;
     const loadScript = window.EDSLite.loadScript;
+    const self = this;
 
-    buildStage(target);
+    const stage = buildStage(target);
     SCENE_CSS.forEach(loadCSS);
+
+    const wantsTuner = String(props.tuner || "on").toLowerCase() !== "off";
 
     // Strictly sequential: three.js has to be there before the scene runs, and
     // the tuner before it reads window.CONTEXT.
@@ -143,24 +143,28 @@
       return chain.then(function () { return loadScript(src); });
     }, Promise.resolve())
       .then(function () {
-        applySettings(props);
-        const wantsTuner = String(props.tuner || "on").toLowerCase() !== "off";
-        return wantsTuner ? loadScript(TUNER_JS) : null;
+        self.scene = window.ContextModelScene.create(stage);
+        applySettings(self.scene, props);
+        if (wantsTuner && !tunerTaken) {
+          tunerTaken = true;
+          window.CONTEXT = self.scene;
+          return loadScript(TUNER_JS);
+        }
+        return null;
       })
       .catch(function (err) {
-        mounted = false;
         console.error("[ContextModel] failed to start", err);
         notice(target, "Context Model could not start: " + err.message);
       });
   }
 
   ContextModel.prototype.destroy = function () {
-    // The scene's own teardown is still to be written: context-core.js takes
-    // the page for the life of the document. Clearing the stage is enough for
-    // the block's error path; a real unmount comes with the instance-scoped
-    // rewrite noted at the top of this file.
+    if (this.scene) {
+      this.scene.destroy();
+      if (window.CONTEXT === this.scene) { window.CONTEXT = null; tunerTaken = false; }
+      this.scene = null;
+    }
     this.target.replaceChildren();
-    mounted = false;
   };
 
   window.AssetRegistry.register("ContextModel", ContextModel);

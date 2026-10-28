@@ -28,6 +28,34 @@
 (function () {
   "use strict";
 
+  /* ------------------------------------------------------------------
+     Instance-scoped, 2026-10-28.
+
+     The scene used to look its three elements up by fixed id, which allowed
+     exactly one of it per document. createScene() is handed the elements
+     instead, so a page can hold several — which is what the AEM block pilot
+     and the block library page need — and it returns the same control
+     surface the tuner has always read, plus a real destroy().
+
+     The old ids still work: when they are present on load the scene boots
+     itself and publishes window.CONTEXT, so experiment 6's own page, its
+     tuner and the console helpers are unchanged.
+
+     The body below is deliberately NOT re-indented into this function. The
+     shaders are template literals and the change stays reviewable as a
+     dozen lines rather than a whole-file reflow.
+     ------------------------------------------------------------------ */
+  function createScene(opts) {
+
+  // Everything the scene listens to, so destroy() can take it all back off.
+  const listeners = [];
+  function on(target, type, fn, options) {
+    target.addEventListener(type, fn, options);
+    listeners.push([target, type, fn, options]);
+  }
+  let alive = true;
+  let rafId = 0;
+
 
   // ---------------------------------------------------------------- settings
   const DEFAULTS = {
@@ -156,9 +184,10 @@
 
   // The study ran in the whole window. Here it lives in the box the page's
   // <video> occupied, so every measurement comes from that box.
-  const canvas = document.getElementById("context-stage");
-  const sticky = document.getElementById("context-sticky");
-  const scrollBox = document.getElementById("context-scroll");
+  const canvas = opts.canvas;
+  const sticky = opts.sticky;
+  const scrollBox = opts.scrollBox;
+  if (!canvas || !sticky || !scrollBox) throw new Error("context-core: canvas, sticky and scrollBox are required");
   let boxW = 1, boxH = 1;
   function navHeight() {
     // measured, never hard-coded: 88 px on desktop, 64 on phones, and the saved
@@ -1354,7 +1383,7 @@
   // ±0.6 range; on a phone the neutral pose is how the device is being held.
   const tilt = { x: 0, y: 0 }, tiltTarget = { x: 0, y: 0 };
   let hoverSeen = false, hoverPresence = 0, shakeLevel = 0, gyroActive = false;
-  window.addEventListener("pointermove", function (e) {
+  on(window, "pointermove", function (e) {
     // relative to the canvas, and the hover only counts while the pointer is over
     // it — in the page the rest of the window belongs to the article, not to us
     const r = canvas.getBoundingClientRect();
@@ -1364,9 +1393,9 @@
     hoverSeen = e.clientX >= r.left && e.clientX <= r.right &&
                 e.clientY >= r.top && e.clientY <= r.bottom;
   }, { passive: true });
-  window.addEventListener("pointerleave", function () { hoverSeen = false; });
-  document.addEventListener("mouseleave", function () { hoverSeen = false; });
-  window.addEventListener("blur", function () { hoverSeen = false; });
+  on(window, "pointerleave", function () { hoverSeen = false; });
+  on(document, "mouseleave", function () { hoverSeen = false; });
+  on(window, "blur", function () { hoverSeen = false; });
 
   // On a phone the parallax comes from ../../lib/tilt-parallax.js, shared with
   // experiments 3 and 4: same plus/minus 1 range as the pointer, the neutral pose is
@@ -1487,7 +1516,7 @@
     else if (kind === "targets") resize();
   }
 
-  window.CONTEXT_INFO = function () {
+  const contextInfo = function () {
     const info = {
       webgl2: isWebGL2,
       msaaRequested: CFG.msaa,
@@ -1666,8 +1695,8 @@
   // The standalone study scrolled the window by itself if nobody touched it. Inside
   // the real page that would hijack the reader, so it is gone: the block simply plays
   // as it is scrolled past, which is what a reader of the page expects.
-  window.CONTEXT_BEAMS = function () { return beams.map(function (b) { return { x: b.x, y: b.y, wait: b.wait, segment: b.si }; }); };
-  window.CONTEXT_SCROLL = function (T) { CFG.scrollPreview = 1; CFG.scrollScrub = T; };
+  const contextBeams = function () { return beams.map(function (b) { return { x: b.x, y: b.y, wait: b.wait, segment: b.si }; }); };
+  const contextScroll = function (T) { CFG.scrollPreview = 1; CFG.scrollScrub = T; };
   layoutScroll();
 
   const _ctr = new THREE.Vector3();
@@ -1751,7 +1780,8 @@
   }
 
   function frame(now) {
-    requestAnimationFrame(frame);
+    if (!alive) return;
+    rafId = requestAnimationFrame(frame);
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     if (document.hidden) return;
@@ -1785,24 +1815,24 @@
   }
 
   // ---------------------------------------------------------------- start
-  window.addEventListener("resize", resize);
+  on(window, "resize", resize);
   buildParticles();   // first: the impacts seat themselves on its columns
   buildImpacts();
   buildTraces();
   partUniforms.uY0.value = lensBottomY(DISC_R) - 0.012;
   resize();
   applyAll();
-  requestAnimationFrame(frame);
+  rafId = requestAnimationFrame(frame);
   // ---------------------------------------------------------------- exported surface
   // context-tuner.js drives the effect entirely through this: the live settings, the
   // values they started from, and the two calls that push a change into the scene.
-  window.CONTEXT = {
+  const api = {
     cfg: CFG,
     defaults: DEFAULTS,
     apply: applyAll,
     rebuild: rebuild,
     t: scrollT,                 // where the block currently is on its timeline, 0..2
-    info: window.CONTEXT_INFO,
+    info: contextInfo,
     readout: function () {
       return "in effect\n" +
         "WebGL" + (isWebGL2 ? "2" : "1") +
@@ -1813,7 +1843,49 @@
         "pre-pass " + Math.round(CFG.prePass * 100) + "%" +
         "   draws " + renderer.info.render.calls +
         "   " + Math.round(fps) + " fps";
+    },
+    beams: contextBeams,
+    scroll: contextScroll,
+    /* Stop the loop, drop every listener, free the GPU memory and clear the
+       canvas. After this the instance is done; create a new one to start again. */
+    destroy: function () {
+      if (!alive) return;
+      alive = false;
+      if (rafId) cancelAnimationFrame(rafId);
+      listeners.forEach(function (l) { l[0].removeEventListener(l[1], l[2], l[3]); });
+      listeners.length = 0;
+      try {
+        scene.traverse(function (o) {
+          if (o.geometry) o.geometry.dispose();
+          if (o.material) [].concat(o.material).forEach(function (m) { m.dispose(); });
+        });
+        renderer.dispose();
+      } catch (err) {
+        console.warn("context-core: teardown was not clean", err);
+      }
     }
   };
+
+  return api;
+
+  }
+
+  /* ---------------------------------------------------------------- surface */
+  window.ContextModelScene = { create: createScene };
+
+  /* Legacy boot: experiment 6's own page carries the three ids and expects the
+     scene to start by itself and to publish window.CONTEXT for its tuner and
+     for the console helpers. Nothing on that page changed. */
+  (function bootLegacy() {
+    const canvas = document.getElementById("context-stage");
+    const sticky = document.getElementById("context-sticky");
+    const scrollBox = document.getElementById("context-scroll");
+    if (!canvas || !sticky || !scrollBox) return;
+    const api = createScene({ canvas: canvas, sticky: sticky, scrollBox: scrollBox });
+    window.CONTEXT = api;
+    window.CONTEXT_INFO = api.info;
+    window.CONTEXT_BEAMS = api.beams;
+    window.CONTEXT_SCROLL = api.scroll;
+  })();
 
 })();

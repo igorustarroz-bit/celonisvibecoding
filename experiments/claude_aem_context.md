@@ -211,17 +211,29 @@ What each piece proves:
   silently dropped. **It is a plain class, not a Svelte component, and the block accepts it** —
   which is the hypothesis in §3.1, now tested at least against our port of their block.
 
-### Known limitations, stated rather than hidden
+### Instance scoping (2026-10-28, the change that followed the pilot)
 
-- `context-core.js` binds to the element ids `context-stage` / `context-sticky` /
-  `context-scroll`, so **one instance per page**. A second one renders a notice. Making the
-  scene instance-scoped is the next change, and it is the same change that would let a block
-  be authored twice on a page.
-- `destroy()` only clears the stage. The scene has no teardown yet; it takes the page for the
-  life of the document.
-- The `--fnd-*` token fallbacks in `eds-lite.css` are stand-ins under a `DELETE ON MIGRATION`
-  comment. The rule itself doubles as the list of tokens their block depends on: four colours,
-  two spacings, one radius, three type ramps.
+The pilot's first version could only be placed once, because `context-core.js` looked its
+three elements up by fixed id. That is fixed, and it is the change the block library page
+depends on:
+
+- `context-core.js` now exposes **`window.ContextModelScene.create({ canvas, sticky,
+  scrollBox })`**, which returns the same control surface the tuner has always read
+  (`cfg`, `defaults`, `apply`, `rebuild`, `info`, `readout`) plus `beams`, `scroll` and a
+  real **`destroy()`** — it stops the loop, removes all five listeners, disposes the
+  geometries, materials and renderer, and clears the canvas.
+- **The old page is untouched.** When the three ids are present on load, the file boots
+  itself and publishes `window.CONTEXT`, `CONTEXT_INFO`, `CONTEXT_BEAMS` and
+  `CONTEXT_SCROLL` exactly as before, so experiment 6 and its tuner did not change.
+- `context.css` carries both spellings: the ids for that page, the classes
+  (`.context-scroll` / `.context-sticky` / `.context-stage`) for scenes built through
+  `create()`.
+- The body of the file was deliberately **not re-indented** into the new function. The
+  shaders are template literals and the change stays reviewable as a dozen lines instead
+  of a whole-file reflow.
+
+One thing stays single: the tuner reads `window.CONTEXT`, and there is only one of those.
+The first instance that asks for a tuner takes it; later ones render without one.
 
 ### Verification (cloud container, Playwright, served over http)
 
@@ -232,6 +244,10 @@ What each piece proves:
   mid-scroll;
 - rule 12: `document.querySelectorAll('input,select,textarea,form').length === 0`;
 - tuner panel present and collapsed on load (`tu-panel tu-closed`);
+- legacy boot: a page carrying the three ids still starts by itself and publishes
+  `window.CONTEXT` + the three console helpers, with the tuner attached;
+- two instances on one page: independent settings (`camAz` 34 and −12 at once), and
+  `destroy()` on the second removes its canvas and leaves the first running, no errors;
 - `scrollWidth === innerWidth` at six scroll depths, at 1440 px and at 390 px.
 
 Still to check on the published URL, as every experiment must be: same-origin resources and
