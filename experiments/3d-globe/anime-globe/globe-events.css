@@ -1,0 +1,162 @@
+/* Event markers on the hero globe (experiment 2) — green dots + city card.
+   Everything is scoped under .ge-* because the saved Celonis page styles
+   almost every bare tag (see claude_tunerui_context.md, "Gotchas"). */
+
+.ge-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 5;              /* under the site header, which lifts itself to 9 */
+  pointer-events: none;    /* only the dots and the card are clickable */
+}
+
+/* ---------- the green dot ---------- */
+.ge-dot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 10px;
+  height: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #5cfe50;
+  box-shadow: 0 0 10px 2px rgba(92, 254, 80, 0.45);
+  pointer-events: auto;
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+  transition: box-shadow 0.18s ease;
+  will-change: transform;
+}
+.ge-dot::before {           /* invisible hit area — a 9px dot is not a touch target */
+  content: "";
+  position: absolute;
+  inset: -9px;
+  border-radius: 50%;
+}
+.ge-dot::after {            /* the halo that pulses outwards */
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid #5cfe50;
+  opacity: 0;
+  pointer-events: none;
+}
+.ge-dot.is-pulsing::after { animation: ge-pulse var(--ge-pulse-ms, 2200ms) ease-out infinite; }
+.ge-dot.is-hover,
+.ge-dot.is-open { box-shadow: 0 0 16px 4px rgba(92, 254, 80, 0.7); }
+.ge-dot:focus-visible { outline: 2px solid #ffffff; outline-offset: 3px; }
+
+@keyframes ge-pulse {
+  0%   { opacity: 0.85; transform: scale(1); }
+  70%  { opacity: 0;    transform: scale(var(--ge-halo, 2.6)); }
+  100% { opacity: 0;    transform: scale(var(--ge-halo, 2.6)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ge-dot.is-pulsing::after { animation: none; }
+}
+
+/* ---------- the city card (Figma: Card08-City-collab, 200x272) ---------- */
+.ge-card {
+  position: absolute;
+  left: 0;
+  top: 0;
+  box-sizing: border-box;
+  width: 200px;
+  max-width: 200px;
+  min-height: 272px;
+  padding: 16px;
+  margin: 0;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #000000;
+  /* not in the Figma frame: the card is pure black on a black hero, so it
+     needs a hairline to read as a surface. Switch it off with cardBorder 0. */
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+  font-family: 'Poppins', 'Helvetica Neue', Arial, sans-serif;
+  font-feature-settings: "ss01" 1, "ss02" 1, "ss04" 1;
+  pointer-events: auto;
+  opacity: 0;
+  transform: scale(0.96);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  will-change: transform;
+}
+.ge-card.is-open { opacity: 1; transform: scale(1); }
+.ge-card.no-border { border-color: transparent; }
+
+.ge-card__kicker {
+  margin: 0;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: #cbcbcb;
+  word-break: break-word;
+}
+.ge-card__city {
+  margin: 4px 0 0 0;         /* the frame's 4px gap */
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ge-card__badge {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 10px);
+  width: 116px;
+  height: 116px;
+  overflow: hidden;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.ge-card__badge img {
+  position: absolute;
+  inset: 4% 5%;
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: none;
+}
+
+.ge-card__btn {
+  position: absolute;
+  left: 16px;
+  top: 216px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: #1d1d1d;
+  text-decoration: none;
+  transition: background 0.18s ease;
+}
+.ge-card__btn:hover { background: #2a2a2a; }
+.ge-card__btn:focus-visible { outline: 2px solid #ffffff; outline-offset: 2px; }
+.ge-card__btn svg { display: block; width: 20px; height: 20px; }
+
+.ge-card__date {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: #cbcbcb;
+  text-align: right;
+  white-space: nowrap;
+}
